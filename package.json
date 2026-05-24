@@ -1,0 +1,24 @@
+{
+  "name": "brennans-story-maker",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A kid friendly web app for making narrated, illustrated stories.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "npm --workspace apps/web run build",
+    "preview": "npm --workspace apps/web run preview",
+    "typecheck": "npm --workspace apps/web run typecheck && tsc --noEmit -p netlify/functions"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^2.8.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@netlify/blobs": "^8.1.0"
+  }
+}

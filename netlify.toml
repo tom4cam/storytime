@@ -1,0 +1,24 @@
+# Brennan's Story Maker: Netlify configuration
+
+[build]
+  command = "npm install && npm --workspace apps/web run build"
+  publish = "apps/web/dist"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["@anthropic-ai/sdk"]
+
+[dev]
+  command = "npm --workspace apps/web run dev"
+  targetPort = 5173
+  port = 8888
+  publish = "apps/web/dist"
+  functions = "netlify/functions"
+
+# SPA fallback: all non file routes go to index.html so React Router works.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false

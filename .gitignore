@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+.netlify/
+.cache/
+
+# Env files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
