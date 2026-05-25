@@ -3,11 +3,21 @@ import type { ReactNode } from 'react';
 import { useT } from '../i18n';
 import { SettingsCog } from './SettingsCog';
 
-export function Layout({ children }: { children: ReactNode }) {
+interface Props {
+  children: ReactNode;
+  showExit?: boolean;
+}
+
+export function Layout({ children, showExit = false }: Props) {
   const t = useT();
   return (
     <div className="page">
       <div className="header">
+        {showExit && (
+          <Link to="/" className="exit-btn" aria-label={t('story.backHome')} title={t('story.backHome')}>
+            {'×'}
+          </Link>
+        )}
         <Link to="/" className="brand">
           {t('brand.name')}
           <small>{t('brand.tagline')}</small>

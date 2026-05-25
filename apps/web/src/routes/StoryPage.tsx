@@ -125,7 +125,7 @@ export function StoryPage() {
   const windowEnd = activeIndex + 1;
 
   return (
-    <Layout>
+    <Layout showExit>
       <h1 className="story-title">{story.title}</h1>
       <div className="story-meta">
         {t('story.versionPrefix')} {story.version} ({t('story.savedPrefix')} {formatDate(story.created_at, lang)})

@@ -7,9 +7,10 @@ export const BOB_TITLE = "Bob's Big Butter Adventure";
 // Character anchors woven into every image prompt so Fal renders Bob
 // and Brennan consistently across all 20 illustrations.
 export const BOB_CHARACTERS =
-  "Bob is a cheerful man with bright golden blond hair and a full golden blond beard, wearing a cozy chef apron. " +
-  "Brennan is his small young son, also with bright golden blond hair, no beard. " +
-  "Eve is Bob's kind wife with brown hair. They all have friendly faces.";
+  "Bob is a cheerful adult man with bright golden blond hair and a short neatly trimmed golden blond beard (not bushy or long), wearing a cozy chef apron. " +
+  "Brennan is a 10-year-old blond boy with bright golden blond hair, smooth face, no beard. He is Bob's only child, so there is exactly one boy in any scene, never two children, never a baby. " +
+  "Eve is Bob's kind adult wife with shoulder-length brown hair. " +
+  "Each scene contains exactly these three people unless the stanza explicitly mentions another character (like a waitress). They all have friendly cartoon faces.";
 
 export const BOB_STANZAS: string[] = [
   "Now this is our Bob, with his golden blond beard, and his hair like the sun, oh, his hair is endeared. He lives with sweet Eve in a snug little spot, with their boy little Brennan, the best son they've got!",
