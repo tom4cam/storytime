@@ -8,12 +8,25 @@ import type { StoryIndex, StoryVersion } from './types';
 const STORIES = 'stories';
 const MEDIA = 'media';
 
+// Inside the Netlify Functions runtime, NETLIFY_BLOBS_CONTEXT is set
+// automatically and the SDK reads it. From a standalone script (e.g.,
+// the seed scripts), we need to pass siteID and token explicitly using
+// NETLIFY_SITE_ID and NETLIFY_AUTH_TOKEN from the environment.
+function storeOptions(name: string) {
+  const base = { name, consistency: 'strong' as const };
+  if (process.env.NETLIFY_BLOBS_CONTEXT) return base;
+  const siteID = process.env.NETLIFY_SITE_ID;
+  const token = process.env.NETLIFY_AUTH_TOKEN;
+  if (siteID && token) return { ...base, siteID, token };
+  return base;
+}
+
 function stories(): Store {
-  return getStore({ name: STORIES, consistency: 'strong' });
+  return getStore(storeOptions(STORIES));
 }
 
 function media(): Store {
-  return getStore({ name: MEDIA, consistency: 'strong' });
+  return getStore(storeOptions(MEDIA));
 }
 
 // Story keys:

@@ -9,8 +9,35 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { buildAndSaveVersion } from '../netlify/functions/_lib/build';
 import { regenerateImagePrompt } from '../netlify/functions/_lib/anthropic';
+import { generateImage } from '../netlify/functions/_lib/fal';
+import { storeMedia } from '../netlify/functions/_lib/storage';
 import { BOB_TITLE, BOB_STANZAS } from './data/bob-source';
 import { PIP_TITLE_EN, PIP_PARAGRAPHS_EN } from './data/pip-source';
+
+const FAL_CONCURRENCY = 6; // Fal free tier caps at 10 concurrent
+
+// Generate images in capped batches to respect Fal's concurrency limit.
+async function generateImagesBatched(
+  storyId: string,
+  version: number,
+  prompts: string[]
+): Promise<string[]> {
+  const urls: string[] = new Array(prompts.length);
+  for (let start = 0; start < prompts.length; start += FAL_CONCURRENCY) {
+    const slice = prompts.slice(start, start + FAL_CONCURRENCY);
+    const results = await Promise.all(
+      slice.map(async (prompt, j) => {
+        const idx = start + j;
+        console.log(`  image ${idx + 1}/${prompts.length}...`);
+        const img = await generateImage(prompt);
+        const url = await storeMedia(`${storyId}-v${version}-p${idx + 1}.png`, img.data, img.contentType);
+        return { idx, url };
+      })
+    );
+    for (const { idx, url } of results) urls[idx] = url;
+  }
+  return urls;
+}
 
 const BOB_ID = 'default-bobs-butter';
 const PIP_ID = 'default-pip-bread';
@@ -53,14 +80,20 @@ async function translatePipToSwedish(): Promise<TranslatedPip> {
 
 async function seedBob() {
   console.log('Seeding Bob...');
-  // Generate image prompts in parallel.
-  const paragraphs = await Promise.all(
+  console.log('  generating image prompts...');
+  const promptedParas = await Promise.all(
     BOB_STANZAS.map(async (text) => ({
       text,
       image_prompt: await regenerateImagePrompt(text, BOB_TITLE),
-      image_url: null as string | null,
     }))
   );
+  console.log('  generating images (batched)...');
+  const urls = await generateImagesBatched(BOB_ID, 1, promptedParas.map((p) => p.image_prompt));
+  const paragraphs = promptedParas.map((p, i) => ({
+    text: p.text,
+    image_prompt: p.image_prompt,
+    image_url: urls[i],
+  }));
   const v = await buildAndSaveVersion({
     id: BOB_ID,
     version: 1,
@@ -76,10 +109,12 @@ async function seedBob() {
 async function seedPipSwedish() {
   console.log('Seeding Pip (sv)...');
   const sv = await translatePipToSwedish();
+  console.log('  generating images (batched)...');
+  const urls = await generateImagesBatched(PIP_ID, 1, PIP_PARAGRAPHS_EN.map((p) => p.image_prompt));
   const paragraphs = PIP_PARAGRAPHS_EN.map((p, i) => ({
     text: sv.paragraphs[i],
-    image_prompt: p.image_prompt, // reuse English image prompts
-    image_url: null as string | null,
+    image_prompt: p.image_prompt,
+    image_url: urls[i],
   }));
   const v = await buildAndSaveVersion({
     id: PIP_ID,
