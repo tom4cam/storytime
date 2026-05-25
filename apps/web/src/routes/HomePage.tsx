@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { listStories } from '../api';
+import { useT } from '../i18n';
 import type { StorySummary } from '../types';
 
 export function HomePage() {
+  const t = useT();
   const [recent, setRecent] = useState<StorySummary[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -18,20 +20,15 @@ export function HomePage() {
   return (
     <Layout>
       <div className="hero">
-        <h1>Make a story. Anything you want.</h1>
-        <p>
-          Pick a hero, pick a place, pick a problem. The story maker will
-          write it, draw it, and read it out loud just for you.
-        </p>
-        <Link to="/create" className="btn sun">Start a new story</Link>
+        <h1>{t('home.heroTitle')}</h1>
+        <p>{t('home.heroBody')}</p>
+        <Link to="/create" className="btn sun">{t('home.heroCta')}</Link>
       </div>
 
-      <h2 style={{ marginTop: 8 }}>Recent stories</h2>
-      {!loaded && <div className="subtle">Loading recent stories...</div>}
+      <h2 style={{ marginTop: 8 }}>{t('home.recentHeading')}</h2>
+      {!loaded && <div className="subtle">{t('home.recentLoading')}</div>}
       {loaded && recent.length === 0 && (
-        <div className="note">
-          No stories yet. Tap the big yellow button to make the first one.
-        </div>
+        <div className="note">{t('home.recentEmpty')}</div>
       )}
       {recent.length > 0 && (
         <div className="recent-list">
