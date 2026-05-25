@@ -10,11 +10,14 @@
     "dev": "netlify dev",
     "build": "npm --workspace apps/web run build",
     "preview": "npm --workspace apps/web run preview",
-    "typecheck": "npm --workspace apps/web run typecheck && tsc --noEmit -p netlify/functions"
+    "typecheck": "npm --workspace apps/web run typecheck && tsc --noEmit -p netlify/functions",
+    "seed:stories": "tsx scripts/seed-default-stories.ts",
+    "seed:samples": "tsx scripts/seed-voice-samples.ts"
   },
   "devDependencies": {
     "@netlify/functions": "^2.8.0",
     "@types/node": "^22.10.0",
+    "tsx": "^4.22.3",
     "typescript": "^5.6.3"
   },
   "dependencies": {
