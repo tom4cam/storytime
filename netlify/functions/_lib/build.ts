@@ -8,6 +8,7 @@ import { generateImage } from './fal';
 import { moderate } from './moderation';
 import { saveStoryVersion, storeMedia } from './storage';
 import type { GeneratedStory, Paragraph, StoryAnswer, StoryVersion } from './types';
+import { charsToWords } from './words';
 
 export class ModerationError extends Error {
   constructor(message: string) {
@@ -104,23 +105,27 @@ export async function buildAndSaveVersion(opts: BuildOptions): Promise<StoryVers
     return { text: p.text, image_url: url, image_prompt: prompt } satisfies Paragraph;
   });
 
-  const narrationText = opts.paragraphs.map((p) => p.text).join('\n\n');
-  const narrationTask = synthesize(narrationText).then((audio) =>
-    storeMedia(`${id}-v${opts.version}.mp3`, audio, 'audio/mpeg')
-  );
+  const paragraphTexts = opts.paragraphs.map((p) => p.text);
+  const narrationText = paragraphTexts.join('\n\n');
+  const narrationTask = synthesize(narrationText).then(async ({ audio, alignment }) => {
+    const url = await storeMedia(`${id}-v${opts.version}.mp3`, audio, 'audio/mpeg');
+    const words = charsToWords(paragraphTexts, alignment);
+    return { url, words };
+  });
 
-  const [paragraphs, narrationUrl] = await Promise.all([Promise.all(tasks), narrationTask]);
+  const [paragraphs, narration] = await Promise.all([Promise.all(tasks), narrationTask]);
 
   const version: StoryVersion = {
     id,
     version: opts.version,
     title,
     paragraphs,
-    narration_url: narrationUrl,
+    narration_url: narration.url,
     source_answers: opts.sourceAnswers,
     created_at: new Date().toISOString(),
     status: 'ready',
     language: opts.language,
+    narration_words: narration.words,
   };
   await saveStoryVersion(version);
   return version;
