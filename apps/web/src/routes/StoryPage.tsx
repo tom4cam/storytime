@@ -5,7 +5,7 @@ import { getStory } from '../api';
 import { useLang, useT } from '../i18n';
 import type { StoryVersion } from '../types';
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 10000;
 
 export function StoryPage() {
   const t = useT();

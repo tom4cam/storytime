@@ -13,7 +13,11 @@ export default async (req: Request, _ctx: Context): Promise<Response> => {
     status: 200,
     headers: {
       'Content-Type': result.contentType,
+      // Browser cache (per user).
       'Cache-Control': 'public, max-age=31536000, immutable',
+      // Netlify edge cache (shared across users) — repeats are served by the
+      // CDN without invoking the function or hitting Blobs.
+      'Netlify-CDN-Cache-Control': 'public, max-age=31536000, immutable',
     },
   });
 };

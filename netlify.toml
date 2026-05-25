@@ -4,6 +4,9 @@
   command = "npm install && npm --workspace apps/web run build"
   publish = "apps/web/dist"
   functions = "netlify/functions"
+  # Skip the build when the commit only touches docs or the README.
+  # Exits 0 (skip) if there are no changes outside the excluded paths.
+  ignore = "git diff --quiet HEAD^ HEAD -- ':(exclude)docs/' ':(exclude)README.md' ':(exclude).gitignore'"
 
 [functions]
   node_bundler = "esbuild"

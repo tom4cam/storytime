@@ -5,7 +5,12 @@ import { json, serverError } from './_lib/util';
 export default async (_req: Request, _ctx: Context): Promise<Response> => {
   try {
     const items = await listStoryIndexes();
-    return json(items.slice(0, 30));
+    // 60s edge cache with a 10 min stale-while-revalidate window. A new
+    // story takes ~60s to build anyway, so a 60s home-page lag is fine.
+    return json(items.slice(0, 30), 200, {
+      'Cache-Control': 'public, max-age=60, stale-while-revalidate=600',
+      'Netlify-CDN-Cache-Control': 'public, max-age=60, stale-while-revalidate=600',
+    });
   } catch (e) {
     console.error('listStories failed', e);
     return serverError((e as Error).message);
