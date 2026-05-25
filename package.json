@@ -1,5 +1,5 @@
 {
-  "name": "brennans-story-maker",
+  "name": "storytime-app",
   "private": true,
   "version": "0.1.0",
   "description": "A kid friendly web app for making narrated, illustrated stories.",
@@ -14,19 +14,16 @@
     "deploy": "wrangler pages deploy",
     "seed:stories": "tsx scripts/seed-default-stories.ts",
     "seed:samples": "tsx scripts/seed-voice-samples.ts",
-    "revert": "tsx scripts/revert-story.ts",
-    "migrate:cloudflare": "tsx scripts/migrate-to-cloudflare.ts"
+    "revert": "tsx scripts/revert-story.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",
     "@cloudflare/workers-types": "^4.20260525.1",
-    "@netlify/functions": "^2.8.0",
     "@types/node": "^22.10.0",
     "tsx": "^4.22.3",
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
-    "@netlify/blobs": "^8.1.0"
+    "@anthropic-ai/sdk": "^0.32.1"
   }
 }

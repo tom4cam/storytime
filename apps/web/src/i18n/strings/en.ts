@@ -1,6 +1,6 @@
 export const en = {
   // Brand and dedication
-  'brand.name': "Brennan & Linnéa's Story Maker",
+  'brand.name': 'storytime',
   'brand.tagline': 'Tell a story. Hear it. Watch it.',
   'dedication.line': "Made with love by Uncle Tom for Brennan and Linnéa's birthdays.",
 

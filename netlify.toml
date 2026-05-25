@@ -1,7 +1,7 @@
 # Brennan's Story Maker: Netlify configuration
 #
 # This project has been migrated to Cloudflare Pages:
-#   https://brennans-story-maker.pages.dev
+#   https://storytime-app.pages.dev
 #
 # Netlify now serves as a permanent 301 redirect so old story links
 # (/s/<id>, etc.) keep working.
@@ -10,7 +10,7 @@
   publish = "_redirect_site"
   # No build needed; we just publish a tiny placeholder dir with a
   # _redirects file. The actual app lives on Cloudflare now.
-  command = "mkdir -p _redirect_site && echo 'Moved to https://brennans-story-maker.pages.dev' > _redirect_site/index.html"
+  command = "mkdir -p _redirect_site && echo 'Moved to https://storytime-app.pages.dev' > _redirect_site/index.html"
   # Skip rebuilds for doc-only commits.
   ignore = "git diff --quiet HEAD^ HEAD -- ':(exclude)docs/' ':(exclude)README.md' ':(exclude).gitignore' ':(exclude)scripts/'"
 
@@ -19,6 +19,6 @@
 # came after the leading slash.
 [[redirects]]
   from = "/*"
-  to = "https://brennans-story-maker.pages.dev/:splat"
+  to = "https://storytime-app.pages.dev/:splat"
   status = 301
   force = true

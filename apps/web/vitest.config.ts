@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/**/*.test.ts',
-      resolve(__dirname, '../../netlify/functions/_lib/**/*.test.ts'),
+      resolve(__dirname, '../../functions/api/_lib/**/*.test.ts'),
     ],
   },
 });

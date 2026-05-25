@@ -2,12 +2,12 @@
 
 This document describes the prompts the app sends to the LLM and the image
 model. Editing prompts in production means editing the corresponding file
-in `netlify/functions/_lib/`; this doc explains what each prompt is doing
+in `functions/api/_lib/`; this doc explains what each prompt is doing
 and what to watch for when tuning.
 
 ## Story generation (Anthropic Claude)
 
-File: `netlify/functions/_lib/anthropic.ts`, exported as
+File: `functions/api/_lib/anthropic.ts`, exported as
 `STORY_SYSTEM_PROMPT`.
 
 ### Goal
@@ -73,7 +73,7 @@ Return only the JSON object.
 
 ## Image prompts (Fal.ai flux/schnell)
 
-File: `netlify/functions/_lib/fal.ts`.
+File: `functions/api/_lib/fal.ts`.
 
 The prompt the model gets is the per paragraph `image_prompt` from the
 story step, plus a constant suffix:
@@ -94,7 +94,7 @@ story step, plus a constant suffix:
 
 ## Image prompt regeneration (Claude, edit flow)
 
-File: `netlify/functions/_lib/anthropic.ts`, function
+File: `functions/api/_lib/anthropic.ts`, function
 `regenerateImagePrompt`.
 
 Used when a kid edits a paragraph and asks for a new illustration. The
@@ -108,7 +108,7 @@ The user message is just the story title and the new paragraph text.
 
 ## Narration (ElevenLabs)
 
-File: `netlify/functions/_lib/elevenlabs.ts`.
+File: `functions/api/_lib/elevenlabs.ts`.
 
 There is no LLM prompt for narration; the full story text is concatenated
 and sent to the Daniel voice with:

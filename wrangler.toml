@@ -2,7 +2,7 @@
 # The Pages project name is set when first linked via `wrangler pages project create`
 # or in the dashboard. Bindings here apply to functions/ files at build time.
 
-name = "brennans-story-maker"
+name = "storytime-app"
 compatibility_date = "2026-05-24"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "apps/web/dist"

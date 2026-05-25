@@ -4,11 +4,13 @@
 //   npm run seed:samples
 //   git add apps/web/public/voice-samples/
 //
-// Required env: ELEVENLABS_API_KEY.
+// Required env: ELEVENLABS_API_KEY. R2 credentials are NOT needed — the
+// samples are written to the local filesystem and bundled with the app.
 
 import { writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
-import { synthesize } from '../netlify/functions/_lib/elevenlabs';
+import { synthesize } from '../functions/api/_lib/elevenlabs';
+import type { Env } from '../functions/api/_lib/env';
 
 interface SampleSpec {
   key: string;
@@ -26,14 +28,17 @@ const SAMPLES: SampleSpec[] = [
 const OUTPUT_DIR = resolve(__dirname, '../apps/web/public/voice-samples');
 
 async function main() {
-  if (!process.env.ELEVENLABS_API_KEY) {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
     console.error('Missing ELEVENLABS_API_KEY');
     process.exit(1);
   }
+  // Voice synthesis is the only env field the script touches; R2 is not used.
+  const env = { ELEVENLABS_API_KEY: apiKey } as unknown as Env;
   await mkdir(OUTPUT_DIR, { recursive: true });
   for (const s of SAMPLES) {
     console.log(`Generating ${s.key}...`);
-    const { audio } = await synthesize(s.text, { voiceId: s.voiceId });
+    const { audio } = await synthesize(env, s.text, { voiceId: s.voiceId });
     const path = `${OUTPUT_DIR}/${s.key}.mp3`;
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, Buffer.from(audio));

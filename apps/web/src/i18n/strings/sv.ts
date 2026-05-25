@@ -2,7 +2,7 @@ import type { StringKey } from './en';
 
 export const sv: Record<StringKey, string> = {
   // Brand and dedication
-  'brand.name': 'Brennan & Linnéas Sagomakare',
+  'brand.name': 'storytime',
   'brand.tagline': 'Berätta en saga. Hör den. Se den.',
   'dedication.line': 'Gjord med kärlek av farbror Tom till Brennans och Linnéas födelsedagar.',
 

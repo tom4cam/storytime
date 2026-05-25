@@ -1,5 +1,5 @@
 {
-  "name": "@brennans-story-maker/web",
+  "name": "@storytime-app/web",
   "private": true,
   "version": "0.1.0",
   "type": "module",

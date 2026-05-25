@@ -1,10 +1,12 @@
-# Brennan & Linnéa's Story Maker
+# storytime
 
 A small web app that lets kids make their own illustrated, narrated stories in English or Swedish.
 
 A kid picks a language, answers a few simple questions (by voice or by typing), and the app writes a short story, draws a cartoon for each paragraph, and reads it out loud. Each story gets its own link, and stories can be edited into new versions later.
 
 Built with love by Uncle Tom for Brennan and Linnéa's birthdays.
+
+Live at [https://storytime-app.pages.dev](https://storytime-app.pages.dev).
 
 ## How it works
 
@@ -22,7 +24,7 @@ Built with love by Uncle Tom for Brennan and Linnéa's birthdays.
    * For each paragraph, Fal flux/schnell draws a cartoon illustration.
    * The full text is synthesized into an MP3 narration with ElevenLabs
      using the Daniel voice.
-   * Everything is saved to Netlify Blobs and the user is redirected to
+   * Everything is saved to Cloudflare R2 and the user is redirected to
      `/s/:id`.
 4. Story page (`/s/:id` or `/s/:id/v/:n`): shows the title, audio bar,
    paragraph text, and an illustration for each paragraph. Old versions are
@@ -34,8 +36,8 @@ Built with love by Uncle Tom for Brennan and Linnéa's birthdays.
 ## Stack
 
 * Frontend: Vite, React 18, TypeScript, plain CSS, React Router.
-* Backend: Netlify Functions (TypeScript, esbuild bundler).
-* Storage: Netlify Blobs (one namespace for story JSON, one for media).
+* Backend: Cloudflare Pages Functions (TypeScript, Workers runtime).
+* Storage: Cloudflare R2 — one bucket for story JSON, one for media.
 * Story text: Anthropic Claude (default model: claude-sonnet-4-6).
 * Images: Fal.ai flux/schnell (square_hd, cartoon style).
 * Narration: ElevenLabs Daniel voice (voice id onwK4e9ZLuTAKqWW03F9).
@@ -45,20 +47,26 @@ Built with love by Uncle Tom for Brennan and Linnéa's birthdays.
 * Languages: English and Swedish, picked per story. UI language is bilingual
   and detected from the browser, overridable via the settings cog.
 
+The old Netlify site issues a permanent 301 to the Cloudflare URL so legacy
+story links keep working; see `netlify.toml`.
+
 ## Repository layout
 
 ```
 apps/web/                Vite React app (the UI)
-netlify/functions/       Serverless API (one file per endpoint)
-netlify/functions/_lib/  Shared helpers (storage, LLM, TTS, moderation)
+functions/api/           Cloudflare Pages Functions (one file per endpoint)
+functions/api/_lib/      Shared helpers (storage, LLM, TTS, moderation)
+scripts/                 Standalone Node scripts (seed, revert)
 docs/PROMPTS.md          Prompt templates with notes for tuning
-netlify.toml             Build, dev, and functions config
+wrangler.toml            Cloudflare Pages config (R2 bindings, build dir)
+netlify.toml             Permanent redirect from the old Netlify origin
 .env.example             Required environment variables
 ```
 
 ## Required environment variables
 
-Set these on the Netlify site (or in a local `.env` for `netlify dev`):
+On the Cloudflare Pages project set these as secrets via
+`wrangler pages secret put NAME`:
 
 * `ANTHROPIC_API_KEY`: Claude story generation.
 * `OPENAI_API_KEY`: OpenAI moderation API.
@@ -70,59 +78,93 @@ Optional:
 * `ANTHROPIC_MODEL`: override the default model.
 * `ELEVENLABS_VOICE_ID`: override the default voice (Daniel).
 
+For local development put the same four keys in a top-level `.env` file
+(gitignored). `wrangler pages dev` reads `.env` automatically.
+
+The seed script needs three additional values to talk to R2 from a Node
+process; see `.env.example`:
+
+* `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` — R2
+  S3-compatible API credentials, created under R2 → Manage R2 API Tokens
+  with read+write on both buckets.
+
 ## Run locally
 
 ```bash
 npm install
-# Put the four keys above into a top level .env file (gitignored).
-npx netlify dev
+# Fill .env with the four API keys.
+npm run dev
 ```
 
-The dev server serves the Vite app on http://localhost:8888 and proxies
-`/.netlify/functions/*` to the local functions runtime.
+`wrangler pages dev` serves the Vite build on http://localhost:8788, runs
+the Pages Functions in `functions/api/`, and provides a local R2 emulation
+for the `STORIES` and `MEDIA` bindings.
 
 ## Seeding default content
 
 Two one-shot scripts populate the home page with seed content:
 
 ```bash
-# Generate the 4 voice-sample MP3s for the voice picker. Run once.
+# Generate the 4 voice-sample MP3s for the voice picker. Run once,
+# then commit the result.
 npm run seed:samples
 git add apps/web/public/voice-samples/
 git commit -m "Add voice samples"
 
 # Seed Bob's Big Butter Adventure (en) and Pip Draken (sv) as defaults.
 # Idempotent; re-running overwrites the same fixed ids.
-npm run seed:stories
+npm run seed:stories                  # both
+npm run seed:stories -- --only=bob    # just Bob
+npm run seed:stories -- --only=pip    # just Pip (sv)
 ```
 
-Both scripts read the standard `.env` file. `seed:stories` additionally
-requires `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` so it can write to
-Netlify Blobs from a local Node process.
+`seed:stories` reads `.env` and additionally requires the three `R2_*`
+values listed above so it can write directly to the production R2 buckets
+over the S3-compatible API.
 
 ## Deploy
 
-The repo is wired to deploy on Netlify. After the first push:
+The Cloudflare Pages project is `storytime-app`. First-time setup:
 
-1. Link the GitHub repo as the site source on Netlify.
-2. Set the four env vars on the site.
-3. Trigger a deploy.
+```bash
+# Create the project (one-time).
+npx wrangler pages project create storytime-app --production-branch main
 
-The included `netlify.toml` already configures the build command, publish
-directory, and functions directory.
+# Create the R2 buckets (one-time, names match wrangler.toml).
+npx wrangler r2 bucket create story-maker-stories
+npx wrangler r2 bucket create story-maker-media
+
+# Put each secret (one per command).
+npx wrangler pages secret put ANTHROPIC_API_KEY --project-name storytime-app
+npx wrangler pages secret put OPENAI_API_KEY    --project-name storytime-app
+npx wrangler pages secret put FAL_KEY           --project-name storytime-app
+npx wrangler pages secret put ELEVENLABS_API_KEY --project-name storytime-app
+```
+
+After that, deploy from a fresh checkout with:
+
+```bash
+npm run build
+npm run deploy
+```
+
+R2 bucket bindings are declared in `wrangler.toml` and attach automatically.
 
 ## API endpoints
 
-All under `/.netlify/functions/`:
+All under `/api/` on the deployed site:
 
-* `POST createStory`: body `{ answers: [{ question, answer }] }`, returns
-  the new `StoryVersion` (v1).
-* `GET getStory?id=...&version=...`: returns a `StoryVersion`.
+* `POST createStory`: body `{ answers: [{ question, answer }], language,
+  voice_id? }`, returns the new `StoryVersion` (v1).
+* `GET  getStory?id=...&version=...`: returns a `StoryVersion`.
 * `POST updateStory`: body `{ id, title, paragraphs: [{ text, image_url,
-  regenerate_image }] }`, returns the new `StoryVersion` (v + 1).
-* `GET listStories`: returns up to 30 recent `StoryIndex` records.
+  regenerate_image }], summary? }`, returns the new `StoryVersion` (v + 1).
+* `POST deleteStory`: body `{ id }`, deletes every version and all media.
+* `GET  listStories`: returns up to 30 recent `StoryIndex` records.
 * `POST moderate`: body `{ text }`, returns `{ flagged, reasons }`.
-* `GET media?key=...`: streams a stored image or audio file.
+* `POST askVoice`: body `{ text, language, voiceId?, speed? }`, returns
+  `audio/mpeg` for the create-flow question prompts.
+* `GET  media?key=...`: streams a stored image or audio file.
 
 ## Style notes
 
@@ -138,7 +180,6 @@ All under `/.netlify/functions/`:
 * No per image regenerate button on the view page; you have to go through
   edit mode to redraw one image.
 * No scrubber UX beyond the native audio control.
-* Background story generation is synchronous and depends on each API
-  responding within the Netlify function timeout (~26 seconds). If stories
-  start timing out, switch `createStory` to a background function and add a
-  small polling loop in the UI.
+* `createStory` is synchronous and depends on each upstream API responding
+  before the Workers subrequest cap is hit. If end-to-end latency grows,
+  switch to a queued / background worker.

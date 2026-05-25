@@ -1,22 +1,30 @@
-// Seeds the two default stories. Run once with `.env` plus
-// NETLIFY_SITE_ID and NETLIFY_AUTH_TOKEN in the environment:
+// Seeds the two default stories into R2. Run once with the standard
+// `.env` (ANTHROPIC_API_KEY, OPENAI_API_KEY, FAL_KEY, ELEVENLABS_API_KEY)
+// plus R2 credentials so the script can write to the production buckets:
 //
-//   npm run seed:stories
+//   R2_ACCOUNT_ID            Cloudflare account id
+//   R2_ACCESS_KEY_ID         R2 API access key id
+//   R2_SECRET_ACCESS_KEY     R2 API secret
 //
-// Both stories are idempotent: they use fixed ids and overwrite on
-// re-run.
+//   npm run seed:stories                     # both stories
+//   npm run seed:stories -- --only=bob       # just Bob
+//   npm run seed:stories -- --only=pip       # just Pip (sv)
+//
+// Both stories are idempotent: fixed ids, overwrite on re-run.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { buildAndSaveVersion } from '../netlify/functions/_lib/build';
-import { regenerateImagePrompt } from '../netlify/functions/_lib/anthropic';
-import { generateImage } from '../netlify/functions/_lib/fal';
-import { storeMedia } from '../netlify/functions/_lib/storage';
+import { buildAndSaveVersion } from '../functions/api/_lib/build';
+import { regenerateImagePrompt } from '../functions/api/_lib/anthropic';
+import { generateImage } from '../functions/api/_lib/fal';
+import { storeMedia } from '../functions/api/_lib/storage';
 import { BOB_TITLE, BOB_STANZAS, BOB_CHARACTERS } from './data/bob-source';
 import { PIP_TITLE_EN, PIP_PARAGRAPHS_EN } from './data/pip-source';
+import { getScriptEnv } from './lib/script-env';
+
+const env = getScriptEnv();
 
 const FAL_CONCURRENCY = 6; // Fal free tier caps at 10 concurrent
 
-// Generate images in capped batches to respect Fal's concurrency limit.
 async function generateImagesBatched(
   storyId: string,
   version: number,
@@ -29,8 +37,8 @@ async function generateImagesBatched(
       slice.map(async (prompt, j) => {
         const idx = start + j;
         console.log(`  image ${idx + 1}/${prompts.length}...`);
-        const img = await generateImage(prompt);
-        const url = await storeMedia(`${storyId}-v${version}-p${idx + 1}.png`, img.data, img.contentType);
+        const img = await generateImage(env, prompt);
+        const url = await storeMedia(env, `${storyId}-v${version}-p${idx + 1}.png`, img.data, img.contentType);
         return { idx, url };
       })
     );
@@ -43,7 +51,7 @@ const BOB_ID = 'default-bobs-butter';
 const PIP_ID = 'default-pip-bread';
 
 const DANIEL_VOICE = 'onwK4e9ZLuTAKqWW03F9'; // English male
-const SANNA_VOICE = '21m00Tcm4TlvDq8ikWAM';  // Placeholder for Swedish female; swap when you have a native voice
+const SANNA_VOICE = '21m00Tcm4TlvDq8ikWAM';  // Placeholder for Swedish female; swap when a native voice is picked
 
 const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
@@ -83,7 +91,7 @@ async function seedBob() {
   console.log('  generating image prompts...');
   const promptedParas = await Promise.all(
     BOB_STANZAS.map(async (text) => {
-      const sceneOnly = await regenerateImagePrompt(text, BOB_TITLE);
+      const sceneOnly = await regenerateImagePrompt(env, text, BOB_TITLE);
       // Prepend the character anchors so Bob and Brennan render
       // consistently across all 20 images (both blond, Bob has a beard).
       const image_prompt = `Cartoon illustration. Characters: ${BOB_CHARACTERS} Scene: ${sceneOnly} Style: bright colors, friendly faces, cartoon style, no text in the image.`;
@@ -97,7 +105,7 @@ async function seedBob() {
     image_prompt: p.image_prompt,
     image_url: urls[i],
   }));
-  const v = await buildAndSaveVersion({
+  const v = await buildAndSaveVersion(env, {
     id: BOB_ID,
     version: 1,
     title: BOB_TITLE,
@@ -119,7 +127,7 @@ async function seedPipSwedish() {
     image_prompt: p.image_prompt,
     image_url: urls[i],
   }));
-  const v = await buildAndSaveVersion({
+  const v = await buildAndSaveVersion(env, {
     id: PIP_ID,
     version: 1,
     title: sv.title,
@@ -132,14 +140,12 @@ async function seedPipSwedish() {
 }
 
 async function main() {
-  const required = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'FAL_KEY', 'ELEVENLABS_API_KEY', 'NETLIFY_SITE_ID', 'NETLIFY_AUTH_TOKEN'];
+  const required = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'FAL_KEY', 'ELEVENLABS_API_KEY'];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length > 0) {
     console.error('Missing env vars:', missing.join(', '));
     process.exit(1);
   }
-  // Optional --only=bob|pip to re-seed just one story without spending
-  // credits on the other.
   const onlyArg = process.argv.find((a) => a.startsWith('--only='));
   const only = onlyArg ? onlyArg.slice('--only='.length) : null;
   if (!only || only === 'bob') await seedBob();
