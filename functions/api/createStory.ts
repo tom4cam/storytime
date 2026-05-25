@@ -14,7 +14,7 @@ interface CreateStoryRequest {
   voice_id?: string;
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let body: CreateStoryRequest;
   try { body = (await request.json()) as CreateStoryRequest; }
   catch (e) { return badRequest((e as Error).message || 'Bad JSON'); }
@@ -41,31 +41,27 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     return serverError((e as Error).message);
   }
 
-  // Kick off the long-running build in the background. waitUntil keeps
-  // the worker alive past the response so the pipeline finishes even
-  // though the client got 202 immediately.
-  waitUntil((async () => {
+  // Build synchronously. User stories are 5-8 paragraphs; total subrequests
+  // stay well under Workers' free-tier 50/invocation cap (≈ 4 calls per
+  // paragraph + ~3 fixed = ~35 max). Pages Functions allow up to 5min
+  // wall-clock per request which is more than enough for ~60s of
+  // generation. waitUntil was tried first but doesn't reliably run the
+  // background body on this configuration, leaving stories stuck in
+  // "generating" forever.
+  try {
+    const story = await buildFromAnswers(env, id, trimmed, body.language, voiceId);
+    return json(story, 200);
+  } catch (e) {
+    const message = e instanceof ModerationError
+      ? e.message
+      : `Something went wrong while making the story: ${(e as Error).message}`;
+    console.error('build failed', e);
     try {
-      const story = await buildFromAnswers(env, id, trimmed, body.language, voiceId);
-      console.log('story built', story.id, story.title, story.paragraphs.length, 'paragraphs');
-    } catch (e) {
-      const message = e instanceof ModerationError
-        ? e.message
-        : `Something went wrong while making the story: ${(e as Error).message}`;
-      console.error('background build failed', e);
-      try {
-        await saveFailedVersion(env, {
-          id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, error: message,
-        });
-      } catch (saveErr) { console.error('Could not record failure state', saveErr); }
-    }
-  })());
-
-  return json({
-    id, version: 1, status: 'generating',
-    title: 'Your new story', paragraphs: [], narration_url: null,
-    source_answers: trimmed, created_at: new Date().toISOString(),
-    language: body.language,
-    ...(voiceId ? { voice_id: voiceId } : {}),
-  }, 202);
+      await saveFailedVersion(env, {
+        id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, error: message,
+      });
+    } catch (saveErr) { console.error('Could not record failure state', saveErr); }
+    if (e instanceof ModerationError) return json({ error: e.message }, 422);
+    return serverError(message);
+  }
 };

@@ -1,5 +1,4 @@
-# SPA fallback for Cloudflare Pages: any path that isn't a static file
-# or /api/* function falls through to index.html so React Router can
-# handle it client-side.
-/api/*  /api/:splat  200
+# SPA fallback for Cloudflare Pages: any path that isn't a static asset
+# or a /api/* function (which Pages auto-routes from functions/api/*.ts)
+# falls through to index.html so React Router handles it client-side.
 /*  /index.html  200

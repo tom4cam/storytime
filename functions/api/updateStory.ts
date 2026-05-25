@@ -14,7 +14,7 @@ interface UpdateStoryRequest {
   paragraphs: { text: string; image_url: string | null; image_prompt?: string; regenerate_image?: boolean }[];
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let body: UpdateStoryRequest;
   try { body = (await request.json()) as UpdateStoryRequest; }
   catch (e) { return badRequest((e as Error).message || 'Bad JSON'); }
@@ -51,28 +51,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   }));
   const sourceAnswers = previous.source_answers ?? [];
 
-  waitUntil((async () => {
+  try {
+    const story = await buildAndSaveVersion(env, {
+      id: body.id, version: nextVersion, title,
+      sourceAnswers, language, voiceId, summary, paragraphs,
+    });
+    return json(story, 200);
+  } catch (e) {
+    console.error('update build failed', e);
     try {
-      const story = await buildAndSaveVersion(env, {
-        id: body.id, version: nextVersion, title,
-        sourceAnswers, language, voiceId, summary, paragraphs,
+      await saveFailedVersion(env, {
+        id: body.id, version: nextVersion, sourceAnswers, language, voiceId,
+        error: `Something went wrong while saving the new version: ${(e as Error).message}`,
       });
-      console.log('story updated', story.id, 'v' + story.version);
-    } catch (e) {
-      console.error('update worker failed', e);
-      try {
-        await saveFailedVersion(env, {
-          id: body.id, version: nextVersion, sourceAnswers, language, voiceId,
-          error: `Something went wrong while saving the new version: ${(e as Error).message}`,
-        });
-      } catch (saveErr) { console.error('Could not record failure state', saveErr); }
-    }
-  })());
-
-  return json({
-    id: body.id, version: nextVersion, status: 'generating',
-    title, paragraphs: [], narration_url: null,
-    source_answers: sourceAnswers, created_at: new Date().toISOString(),
-    language, ...(voiceId ? { voice_id: voiceId } : {}),
-  }, 202);
+    } catch (saveErr) { console.error('Could not record failure state', saveErr); }
+    return serverError((e as Error).message);
+  }
 };

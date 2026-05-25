@@ -1,27 +1,24 @@
 # Brennan's Story Maker: Netlify configuration
+#
+# This project has been migrated to Cloudflare Pages:
+#   https://brennans-story-maker.pages.dev
+#
+# Netlify now serves as a permanent 301 redirect so old story links
+# (/s/<id>, etc.) keep working.
 
 [build]
-  command = "npm install && npm --workspace apps/web run build"
-  publish = "apps/web/dist"
-  functions = "netlify/functions"
-  # Skip the build when the commit only touches docs or the README.
-  # Exits 0 (skip) if there are no changes outside the excluded paths.
+  publish = "_redirect_site"
+  # No build needed; we just publish a tiny placeholder dir with a
+  # _redirects file. The actual app lives on Cloudflare now.
+  command = "mkdir -p _redirect_site && echo 'Moved to https://brennans-story-maker.pages.dev' > _redirect_site/index.html"
+  # Skip rebuilds for doc-only commits.
   ignore = "git diff --quiet HEAD^ HEAD -- ':(exclude)docs/' ':(exclude)README.md' ':(exclude).gitignore' ':(exclude)scripts/'"
 
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["@anthropic-ai/sdk"]
-
-[dev]
-  command = "npm --workspace apps/web run dev"
-  targetPort = 5173
-  port = 8888
-  publish = "apps/web/dist"
-  functions = "netlify/functions"
-
-# SPA fallback: all non file routes go to index.html so React Router works.
+# 301 redirect everything to the new Cloudflare site, preserving the
+# path and query string. The `:splat` placeholder captures whatever
+# came after the leading slash.
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false
+  to = "https://brennans-story-maker.pages.dev/:splat"
+  status = 301
+  force = true
