@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLang, useT } from '../i18n';
+import { usePrefs } from '../prefs';
 
 export function SettingsCog() {
   const t = useT();
   const { lang, setLang } = useLang();
+  const [prefs, setPrefs] = usePrefs();
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
@@ -52,6 +54,27 @@ export function SettingsCog() {
                 aria-pressed={lang === 'sv'}
               >
                 {t('settings.languageSv')}
+              </button>
+            </div>
+          </div>
+          <div className="cog-row">
+            <span className="cog-label">{t('settings.slow')}</span>
+            <div className="cog-segmented">
+              <button
+                type="button"
+                className={!prefs.slow ? 'on' : ''}
+                onClick={() => setPrefs({ slow: false })}
+                aria-pressed={!prefs.slow}
+              >
+                {t('settings.slowOff')}
+              </button>
+              <button
+                type="button"
+                className={prefs.slow ? 'on' : ''}
+                onClick={() => setPrefs({ slow: true })}
+                aria-pressed={prefs.slow}
+              >
+                {t('settings.slowOn')}
               </button>
             </div>
           </div>

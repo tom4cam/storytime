@@ -95,7 +95,44 @@ export const en = {
   'settings.language': 'Language',
   'settings.languageEn': 'English',
   'settings.languageSv': 'Svenska',
+  'settings.slow': 'Speech speed',
+  'settings.slowOn': 'Slow',
+  'settings.slowOff': 'Normal',
   'settings.close': 'Close',
+
+  // Story-type opener
+  'opener.title': 'What kind of story do you want?',
+  'opener.spoken': 'What kind of story do you want?',
+  'opener.chip.adventure': 'Adventure',
+  'opener.chip.silly': 'Silly',
+  'opener.chip.animals': 'Animal friends',
+  'opener.chip.bedtime': 'Bedtime calm',
+  'opener.chip.magic': 'Magic',
+  'opener.chip.mystery': 'Mystery',
+  'opener.chip.surprise': 'Surprise me',
+  'opener.placeholder': 'Or tell me your own idea',
+
+  // Moderation redirect
+  'mod.redirectTitle': "Let's pick something different.",
+  'mod.redirectBody': 'How about one of these?',
+
+  // Voice picker
+  'voice.stepTitle': 'Pick a voice to read your story.',
+  'voice.playSample': 'Play sample',
+  'voice.next': 'Use this voice',
+
+  // Helpers (per-question)
+  'help.simpler': 'Say it simpler',
+  'help.original': 'Say it the normal way',
+  'help.yesno': 'Help me answer',
+  'help.yes': 'Yes',
+  'help.no': 'No',
+  'help.cancel': 'Never mind',
+
+  // Per-question simpler variants (hero/setting/goal)
+  'q.hero.simpler': 'Who is in your story? Tell me their name.',
+  'q.setting.simpler': 'Where does it happen?',
+  'q.goal.simpler': 'What do they want?',
 
   // Errors
   'error.generic': 'Something went wrong. Please try again.',

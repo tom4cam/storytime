@@ -27,6 +27,47 @@ export function cancelSpeech() {
   }
 }
 
+// --- ElevenLabs-quality question audio with a browser-TTS fallback ---
+
+const askCache = new Map<string, Blob>();
+let askAudio: HTMLAudioElement | null = null;
+
+export interface AskVoiceOpts {
+  language: 'en' | 'sv';
+  voiceId: string;
+  speed?: number;
+}
+
+export async function playAskVoice(text: string, opts: AskVoiceOpts): Promise<void> {
+  const cacheKey = `${opts.language}|${opts.voiceId}|${opts.speed ?? 1}|${text}`;
+  let blob = askCache.get(cacheKey);
+  if (!blob) {
+    const res = await fetch('/.netlify/functions/askVoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, language: opts.language, voiceId: opts.voiceId, speed: opts.speed }),
+    });
+    if (!res.ok) throw new Error(`askVoice failed (${res.status})`);
+    blob = await res.blob();
+    askCache.set(cacheKey, blob);
+  }
+  if (askAudio) { askAudio.pause(); askAudio.src = ''; }
+  askAudio = new Audio(URL.createObjectURL(blob));
+  await askAudio.play();
+}
+
+export function stopAskVoice() {
+  if (askAudio) { askAudio.pause(); askAudio = null; }
+}
+
+export async function speakBest(text: string, opts: AskVoiceOpts): Promise<void> {
+  try {
+    await playAskVoice(text, opts);
+  } catch {
+    speak(text);
+  }
+}
+
 // Some browsers expose SpeechRecognition under a webkit prefix.
 type SRConstructor = new () => SpeechRecognitionLike;
 interface SpeechRecognitionLike {

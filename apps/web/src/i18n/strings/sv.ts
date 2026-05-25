@@ -97,7 +97,44 @@ export const sv: Record<StringKey, string> = {
   'settings.language': 'Språk',
   'settings.languageEn': 'English',
   'settings.languageSv': 'Svenska',
+  'settings.slow': 'Talhastighet',
+  'settings.slowOn': 'Långsam',
+  'settings.slowOff': 'Normal',
   'settings.close': 'Stäng',
+
+  // Story-type opener
+  'opener.title': 'Vilken sorts saga vill du ha?',
+  'opener.spoken': 'Vilken sorts saga vill du ha?',
+  'opener.chip.adventure': 'Äventyr',
+  'opener.chip.silly': 'Tokigt',
+  'opener.chip.animals': 'Djurvänner',
+  'opener.chip.bedtime': 'Lugn godnattsaga',
+  'opener.chip.magic': 'Magi',
+  'opener.chip.mystery': 'Mysterium',
+  'opener.chip.surprise': 'Överraska mig',
+  'opener.placeholder': 'Eller berätta din egen idé',
+
+  // Moderation redirect
+  'mod.redirectTitle': 'Vi väljer något annat.',
+  'mod.redirectBody': 'Hur är det med någon av dessa?',
+
+  // Voice picker
+  'voice.stepTitle': 'Välj en röst som läser din saga.',
+  'voice.playSample': 'Spela exempel',
+  'voice.next': 'Använd den här rösten',
+
+  // Helpers (per-question)
+  'help.simpler': 'Säg det enklare',
+  'help.original': 'Säg det vanligt',
+  'help.yesno': 'Hjälp mig svara',
+  'help.yes': 'Ja',
+  'help.no': 'Nej',
+  'help.cancel': 'Glöm det',
+
+  // Per-question simpler variants (hero/setting/goal)
+  'q.hero.simpler': 'Vem är med i din saga? Säg vad de heter.',
+  'q.setting.simpler': 'Var händer det?',
+  'q.goal.simpler': 'Vad vill de?',
 
   // Errors
   'error.generic': 'Något gick fel. Försök igen.',
