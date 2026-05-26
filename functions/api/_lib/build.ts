@@ -3,7 +3,7 @@
 
 import type { Env } from './env';
 import { generateStory, regenerateImagePrompt } from './anthropic';
-import { synthesize } from './elevenlabs';
+import { synthesize } from './tts';
 import { generateImage } from './fal';
 import { moderate } from './moderation';
 import { saveStoryVersion, storeMedia } from './storage';

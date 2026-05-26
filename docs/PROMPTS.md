@@ -106,22 +106,46 @@ Return one short sentence describing the scene for a cartoon illustrator. Bright
 
 The user message is just the story title and the new paragraph text.
 
-## Narration (ElevenLabs)
+## Narration (OpenAI TTS + Whisper alignment)
 
-File: `functions/api/_lib/elevenlabs.ts`.
+File: `functions/api/_lib/tts.ts`.
 
-There is no LLM prompt for narration; the full story text is concatenated
-and sent to the Daniel voice with:
+There is no LLM prompt for narration. The full story text is concatenated
+and sent to `tts-1` with the picked voice:
 
 ```
-model_id: eleven_multilingual_v2
-voice_settings: { stability: 0.55, similarity_boost: 0.75, style: 0.15, use_speaker_boost: true }
+model: tts-1
+voice: onyx | nova | shimmer | echo  (mapped from Daniel | Rachel | Sanna | Adam)
+response_format: mp3
 ```
+
+The returned MP3 is then sent to `whisper-1` with word-level timestamps
+to drive the karaoke-style word highlight on the story page:
+
+```
+model: whisper-1
+response_format: verbose_json
+timestamp_granularities: ["word"]
+prompt: <first 224 chars of the source>  // biases Whisper toward source spellings
+```
+
+### Drift mitigation
+
+Whisper transcribes the audio, not the source. Names, contractions, and
+multilingual words can come back slightly different. `alignWhisperToSource`
+pairs Whisper words to source words via Needleman-Wunsch (match=2,
+mismatch=0, gap=-1), uses each matched word's start/end as a hard anchor,
+and linearly interpolates per-character times between anchors. Whisper
+words with no source match are dropped; source words with no Whisper match
+get their times from the surrounding anchors. The result is a
+`CharacterAlignment` over the source text, the shape `charsToWords` (the
+old ElevenLabs alignment consumer) already expects.
 
 ### Things to watch
 
-* If the narration sounds flat, raise `style` (0.0 to 1.0) for more
-  expressive delivery, at the cost of stability.
-* If the voice drifts between sentences, raise `stability`.
-* For longer stories, consider chunking and concatenating to stay under
-  ElevenLabs character limits.
+* Unknown voice ids (e.g., legacy ElevenLabs ids on old stories) fall back
+  to `nova` so the audio still plays.
+* If `tts-1` quality is too flat, try `tts-1-hd` (slower, ~2x cost).
+* If the highlight drifts on long stories, the issue is almost always at
+  Whisper word boundaries; check `wh.words` against the source text in
+  isolation before tweaking the alignment scoring.

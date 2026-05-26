@@ -22,8 +22,9 @@ Live at [https://storytime-app.pages.dev](https://storytime-app.pages.dev).
    * Claude (Sonnet 4.6) writes a 5 to 8 paragraph G rated story.
    * The generated text is moderated again before saving.
    * For each paragraph, Fal flux/schnell draws a cartoon illustration.
-   * The full text is synthesized into an MP3 narration with ElevenLabs
-     using the Daniel voice.
+   * The full text is synthesized into an MP3 narration with OpenAI
+     `tts-1`, and Whisper (`whisper-1`) aligns the audio back to the source
+     text to drive the word-by-word karaoke highlight.
    * Everything is saved to Cloudflare R2 and the user is redirected to
      `/s/:id`.
 4. Story page (`/s/:id` or `/s/:id/v/:n`): shows the title, audio bar,
@@ -40,7 +41,9 @@ Live at [https://storytime-app.pages.dev](https://storytime-app.pages.dev).
 * Storage: Cloudflare R2 — one bucket for story JSON, one for media.
 * Story text: Anthropic Claude (default model: claude-sonnet-4-6).
 * Images: Fal.ai flux/schnell (square_hd, cartoon style).
-* Narration: ElevenLabs Daniel voice (voice id onwK4e9ZLuTAKqWW03F9).
+* Narration: OpenAI `tts-1`. Four voice slots map to OpenAI voices
+  (Daniel→onyx, Rachel→nova, Sanna→shimmer, Adam→echo).
+* Word timing: OpenAI Whisper (`whisper-1`) with `timestamp_granularities`.
 * Moderation: OpenAI omni-moderation-latest.
 * Speech in the browser: SpeechSynthesis (TTS for questions) and Web Speech
   API (STT for answers, with a typed fallback).
@@ -69,16 +72,14 @@ On the Cloudflare Pages project set these as secrets via
 `wrangler pages secret put NAME`:
 
 * `ANTHROPIC_API_KEY`: Claude story generation.
-* `OPENAI_API_KEY`: OpenAI moderation API.
+* `OPENAI_API_KEY`: OpenAI moderation, TTS (`tts-1`), and Whisper alignment.
 * `FAL_KEY`: Fal.ai image generation.
-* `ELEVENLABS_API_KEY`: ElevenLabs narration.
 
 Optional:
 
 * `ANTHROPIC_MODEL`: override the default model.
-* `ELEVENLABS_VOICE_ID`: override the default voice (Daniel).
 
-For local development put the same four keys in a top-level `.env` file
+For local development put the same three keys in a top-level `.env` file
 (gitignored). `wrangler pages dev` reads `.env` automatically.
 
 The seed script needs three additional values to talk to R2 from a Node
@@ -138,7 +139,6 @@ npx wrangler r2 bucket create story-maker-media
 npx wrangler pages secret put ANTHROPIC_API_KEY --project-name storytime-app
 npx wrangler pages secret put OPENAI_API_KEY    --project-name storytime-app
 npx wrangler pages secret put FAL_KEY           --project-name storytime-app
-npx wrangler pages secret put ELEVENLABS_API_KEY --project-name storytime-app
 ```
 
 After that, deploy from a fresh checkout with:

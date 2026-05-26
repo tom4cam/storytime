@@ -57,8 +57,8 @@ const PIP_PARAGRAPHS_EN: PipPara[] = [
   { text: 'When the timer rang, Pip pulled out a loaf that was perfectly golden and round. The whole bakery smelled amazing. Pip and Marta shared a big warm slice together, and Pip giggled with joy.', image_prompt: 'Friendly cartoon dragon Pip and a tiny mouse sitting at a small table in the cozy mountain bakery, sharing a golden loaf of bread, both smiling with crumbs on their chins.' },
 ];
 
-const DANIEL_VOICE = 'onwK4e9ZLuTAKqWW03F9';
-const SANNA_VOICE = '21m00Tcm4TlvDq8ikWAM';
+const DANIEL_VOICE = 'onyx';
+const SANNA_VOICE = 'shimmer';
 
 async function seedBob(env: Env): Promise<string> {
   const prompts = await Promise.all(

@@ -82,7 +82,7 @@ export function CreatePage() {
     const text = t(key);
     void speakBest(text, {
       language: storyLang,
-      voiceId: voiceMeta.elevenlabsVoiceId,
+      voiceId: voiceMeta.voiceId,
       speed: prefs.slow ? 0.75 : undefined,
     });
   };
@@ -291,7 +291,7 @@ export function CreatePage() {
       }
     }
     try {
-      const story = await createStory(payload, storyLang, voiceMeta.elevenlabsVoiceId);
+      const story = await createStory(payload, storyLang, voiceMeta.voiceId);
       navigate(`/s/${story.id}`);
     } catch (e) {
       setSubmitting(false);

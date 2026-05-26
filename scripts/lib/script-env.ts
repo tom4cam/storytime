@@ -197,8 +197,6 @@ export function getScriptEnv() {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '',
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
     FAL_KEY: process.env.FAL_KEY ?? '',
-    ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY ?? '',
     ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
-    ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID,
   } as unknown as import('../../functions/api/_lib/env').Env;
 }

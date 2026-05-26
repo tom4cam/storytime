@@ -28,7 +28,7 @@ export function VoicePicker({ value, onChange }: Props) {
             <label className="voice-main">
               <input type="radio" name="voice" checked={checked} onChange={() => onChange(v.key)} />
               <span className="voice-name">{v.displayName}</span>
-              <span className="voice-tag">{v.language.toUpperCase()} {v.gender === 'f' ? '♀' : '♂'}</span>
+              <span className="voice-tag">{v.gender === 'f' ? '♀' : '♂'}</span>
             </label>
             <button
               type="button"

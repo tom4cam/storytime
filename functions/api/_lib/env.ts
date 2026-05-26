@@ -13,11 +13,9 @@ export interface Env {
   ANTHROPIC_API_KEY: string;
   OPENAI_API_KEY: string;
   FAL_KEY: string;
-  ELEVENLABS_API_KEY: string;
 
   // Public vars
   ANTHROPIC_MODEL?: string;
-  ELEVENLABS_VOICE_ID?: string;
 }
 
 export function requireEnv(env: Env, key: keyof Env): string {

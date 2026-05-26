@@ -1,5 +1,5 @@
 // Seeds the two default stories into R2. Run once with the standard
-// `.env` (ANTHROPIC_API_KEY, OPENAI_API_KEY, FAL_KEY, ELEVENLABS_API_KEY)
+// `.env` (ANTHROPIC_API_KEY, OPENAI_API_KEY, FAL_KEY)
 // plus R2 credentials so the script can write to the production buckets:
 //
 //   R2_ACCOUNT_ID            Cloudflare account id
@@ -50,8 +50,8 @@ async function generateImagesBatched(
 const BOB_ID = 'default-bobs-butter';
 const PIP_ID = 'default-pip-bread';
 
-const DANIEL_VOICE = 'onwK4e9ZLuTAKqWW03F9'; // English male
-const SANNA_VOICE = '21m00Tcm4TlvDq8ikWAM';  // Placeholder for Swedish female; swap when a native voice is picked
+const DANIEL_VOICE = 'onyx';   // Daniel slot — OpenAI tts-1 male voice
+const SANNA_VOICE = 'shimmer'; // Sanna slot — OpenAI tts-1 female voice
 
 const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
@@ -140,7 +140,7 @@ async function seedPipSwedish() {
 }
 
 async function main() {
-  const required = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'FAL_KEY', 'ELEVENLABS_API_KEY'];
+  const required = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'FAL_KEY'];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length > 0) {
     console.error('Missing env vars:', missing.join(', '));

@@ -3,7 +3,7 @@
 // Edge-cached for 24h.
 
 import type { Env } from './_lib/env';
-import { synthesize } from './_lib/elevenlabs';
+import { synthesize } from './_lib/tts';
 import { badRequest, serverError } from './_lib/util';
 
 interface AskVoiceRequest {
