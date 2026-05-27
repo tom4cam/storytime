@@ -79,6 +79,10 @@ export const sv: Record<StringKey, string> = {
   'story.listed': 'Visas på startsidan',
   'story.unlisted': 'Dold från startsidan',
   'story.listingFailed': 'Det gick inte att uppdatera — försök igen.',
+  'story.translate': 'Översätt',
+  'story.translateChoose': 'Översätt till:',
+  'story.translating': 'Översätter...',
+  'story.translateError': 'Översättningen misslyckades — försök igen.',
 
   // Edit page
   'edit.loading': 'Laddar sagan...',

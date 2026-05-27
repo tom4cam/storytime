@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { AudioBar, type AudioBarRef } from '../components/AudioBar';
-import { deleteStory, getStory, updateStoryListing } from '../api';
+import { deleteStory, getStory, translateStory as apiTranslate, updateStoryListing } from '../api';
 import { getCreatorId } from '../creatorId';
 import { useAudioSync } from '../audioSync';
 import { useLang, useT } from '../i18n';
@@ -30,6 +30,22 @@ export function StoryPage() {
   const isOwner = !!story?.creator_id && story.creator_id !== 'system' && story.creator_id === myId;
   const [listed, setListedLocal] = useState<boolean>(story?.listed !== false);
   const [listingError, setListingError] = useState<string | null>(null);
+  const [translatePickerOpen, setTranslatePickerOpen] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+
+  const onPickTranslation = async (target: 'en' | 'sv' | 'bg' | 'es' | 'fr') => {
+    if (!story) return;
+    setTranslating(true);
+    setTranslateError(null);
+    try {
+      const next = await apiTranslate(story.id, target);
+      navigate(`/s/${next.id}`);
+    } catch (e) {
+      setTranslating(false);
+      setTranslateError(`${t('story.translateError')} (${(e as Error).message})`);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -178,8 +194,34 @@ export function StoryPage() {
         <button type="button" className="btn ghost" onClick={() => window.print()}>
           {t('story.download')}
         </button>
+        <button type="button" className="btn ghost" onClick={() => setTranslatePickerOpen((v) => !v)}>
+          {t('story.translate')}
+        </button>
         <Link to="/create" className="btn">{t('story.makeAnother')}</Link>
       </div>
+
+      {translatePickerOpen && story && (
+        <div className="card no-print" style={{ marginTop: 12 }}>
+          <div className="question">{t('story.translateChoose')}</div>
+          {translating && <div className="subtle">{t('story.translating')}</div>}
+          {translateError && <div className="error">{translateError}</div>}
+          <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 8 }}>
+            {(['en','sv','bg','es','fr'] as const)
+              .filter((c) => c !== story.language)
+              .map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  className="btn"
+                  disabled={translating}
+                  onClick={() => onPickTranslation(code)}
+                >
+                  {t(`settings.language${code[0].toUpperCase()}${code[1]}` as 'settings.languageEn')}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
 
       {isOwner && !confirmingDelete && (
         <div className="row no-print" style={{ justifyContent: 'center', marginTop: 16 }}>
