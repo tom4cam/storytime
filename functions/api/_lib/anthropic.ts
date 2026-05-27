@@ -92,3 +92,52 @@ export async function regenerateImagePrompt(env: Env, paragraphText: string, sto
   if (!block || block.type !== 'text') return paragraphText.slice(0, 200);
   return block.text.trim().replace(/^"|"$/g, '');
 }
+
+export interface TranslatedStoryPayload {
+  title: string;
+  paragraphs: string[];
+}
+
+// Exported only for tests.
+export function __parseTranslation(raw: string): TranslatedStoryPayload {
+  const text = raw.trim();
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end < 0) throw new Error(`translation: no JSON object found`);
+  const parsed = JSON.parse(text.slice(start, end + 1));
+  if (!parsed.title || !Array.isArray(parsed.paragraphs)) {
+    throw new Error('translation: missing title or paragraphs');
+  }
+  return { title: String(parsed.title), paragraphs: parsed.paragraphs.map(String) };
+}
+
+export async function translateStory(
+  env: Env,
+  source: { title: string; paragraphs: string[]; sourceLanguage: string },
+  targetLanguage: Lang
+): Promise<TranslatedStoryPayload> {
+  const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
+  const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const client = new Anthropic({ apiKey });
+
+  const targetName = LANG_NAMES[targetLanguage];
+  const body = source.paragraphs.map((p, i) => `[${i + 1}] ${p}`).join('\n\n');
+
+  const res = await client.messages.create({
+    model,
+    max_tokens: 3000,
+    system:
+      `Translate the given children's story into ${targetName} suitable for ages 3-8. ` +
+      `Keep proper names (Pip, Marta, Bob, Brennan, Linnéa, etc.) unchanged. ` +
+      `Return strict JSON with this shape: {"title": "...", "paragraphs": ["...", "...", ...]}. ` +
+      `No prose outside JSON, no code fences. Same number of paragraphs as the source.`,
+    messages: [{ role: 'user', content: `Title: ${source.title}\n\n${body}\n\nReturn JSON.` }],
+  });
+  const block = res.content.find((b) => b.type === 'text');
+  if (!block || block.type !== 'text') throw new Error('translation: Claude returned no text');
+  const parsed = __parseTranslation(block.text);
+  if (parsed.paragraphs.length !== source.paragraphs.length) {
+    throw new Error(`translation: expected ${source.paragraphs.length} paragraphs, got ${parsed.paragraphs.length}`);
+  }
+  return parsed;
+}
