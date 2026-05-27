@@ -87,3 +87,16 @@ export async function deleteStory(id: string): Promise<void> {
     throw new Error(`Delete failed (${res.status}): ${detail}`);
   }
 }
+
+export async function translateStory(
+  id: string,
+  targetLanguage: 'en' | 'sv' | 'bg' | 'es' | 'fr',
+  version?: number
+): Promise<StoryVersion> {
+  const res = await fetch(`${FN_BASE}/translateStory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, version, target_language: targetLanguage }),
+  });
+  return jsonOrThrow<StoryVersion>(res);
+}
