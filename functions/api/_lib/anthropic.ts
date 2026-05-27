@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Env } from './env';
 import type { GeneratedStory, Lang, StoryAnswer } from './types';
 import { requireEnv } from './env';
+import { notifyAdminFailure } from './alerts';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
@@ -48,17 +49,23 @@ export async function generateStory(env: Env, answers: StoryAnswer[], language: 
   const langName = LANG_NAMES[language];
   const languageInstruction = `Write the title and every paragraph's "text" in ${langName}. Keep every "image_prompt" in English so the image model understands it.`;
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: 2500,
-    system: STORY_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\nReturn only the JSON object.`,
-      },
-    ],
-  });
+  let response: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    response = await client.messages.create({
+      model,
+      max_tokens: 2500,
+      system: STORY_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\nReturn only the JSON object.`,
+        },
+      ],
+    });
+  } catch (e) {
+    await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
+    throw e;
+  }
 
   const textBlock = response.content.find((b) => b.type === 'text');
   if (!textBlock || textBlock.type !== 'text') throw new Error('Claude did not return any text');
@@ -80,14 +87,20 @@ export async function regenerateImagePrompt(env: Env, paragraphText: string, sto
   const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
   const client = new Anthropic({ apiKey });
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
-  const response = await client.messages.create({
-    model,
-    max_tokens: 200,
-    system: 'Return one short sentence describing the scene for a cartoon illustrator. Bright colors, friendly faces, cartoon style, no text in the image. Around 20 words. No quotes, no prefix.',
-    messages: [
-      { role: 'user', content: `Story title: ${storyTitle}\n\nParagraph:\n${paragraphText}\n\nWrite the image prompt only.` },
-    ],
-  });
+  let response: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    response = await client.messages.create({
+      model,
+      max_tokens: 200,
+      system: 'Return one short sentence describing the scene for a cartoon illustrator. Bright colors, friendly faces, cartoon style, no text in the image. Around 20 words. No quotes, no prefix.',
+      messages: [
+        { role: 'user', content: `Story title: ${storyTitle}\n\nParagraph:\n${paragraphText}\n\nWrite the image prompt only.` },
+      ],
+    });
+  } catch (e) {
+    await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
+    throw e;
+  }
   const block = response.content.find((b) => b.type === 'text');
   if (!block || block.type !== 'text') return paragraphText.slice(0, 200);
   return block.text.trim().replace(/^"|"$/g, '');
@@ -123,16 +136,22 @@ export async function translateStory(
   const targetName = LANG_NAMES[targetLanguage];
   const body = source.paragraphs.map((p, i) => `[${i + 1}] ${p}`).join('\n\n');
 
-  const res = await client.messages.create({
-    model,
-    max_tokens: 3000,
-    system:
-      `Translate the given children's story into ${targetName} suitable for ages 3-8. ` +
-      `Keep proper names (Pip, Marta, Bob, Brennan, Linnéa, etc.) unchanged. ` +
-      `Return strict JSON with this shape: {"title": "...", "paragraphs": ["...", "...", ...]}. ` +
-      `No prose outside JSON, no code fences. Same number of paragraphs as the source.`,
-    messages: [{ role: 'user', content: `Title: ${source.title}\n\n${body}\n\nReturn JSON.` }],
-  });
+  let res: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    res = await client.messages.create({
+      model,
+      max_tokens: 3000,
+      system:
+        `Translate the given children's story into ${targetName} suitable for ages 3-8. ` +
+        `Keep proper names (Pip, Marta, Bob, Brennan, Linnéa, etc.) unchanged. ` +
+        `Return strict JSON with this shape: {"title": "...", "paragraphs": ["...", "...", ...]}. ` +
+        `No prose outside JSON, no code fences. Same number of paragraphs as the source.`,
+      messages: [{ role: 'user', content: `Title: ${source.title}\n\n${body}\n\nReturn JSON.` }],
+    });
+  } catch (e) {
+    await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
+    throw e;
+  }
   const block = res.content.find((b) => b.type === 'text');
   if (!block || block.type !== 'text') throw new Error('translation: Claude returned no text');
   const parsed = __parseTranslation(block.text);

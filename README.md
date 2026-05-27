@@ -78,6 +78,7 @@ On the Cloudflare Pages project set these as secrets via
 Optional:
 
 * `ANTHROPIC_MODEL`: override the default model.
+* `RESEND_API_KEY`: enables admin failure-alert emails (Resend). Send-from is `onboarding@resend.dev`; to use a custom domain, verify it in the Resend dashboard and update `SENDER` in `functions/api/_lib/alerts.ts`.
 
 For local development put the same three keys in a top-level `.env` file
 (gitignored). `wrangler pages dev` reads `.env` automatically.

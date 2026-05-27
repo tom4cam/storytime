@@ -11,6 +11,7 @@
 import type { Env } from './env';
 import type { CharacterAlignment } from './words';
 import { requireEnv } from './env';
+import { classifyError, notifyAdminFailure } from './alerts';
 
 const TTS_MODEL = 'tts-1';
 const STT_MODEL = 'whisper-1';
@@ -43,19 +44,27 @@ export async function synthesize(env: Env, text: string, opts: SynthOpts = {}): 
   const apiKey = requireEnv(env, 'OPENAI_API_KEY');
   const voice = pickVoice(opts.voiceId);
 
-  const ttsRes = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: TTS_MODEL,
-      voice,
-      input: text,
-      response_format: 'mp3',
-      ...(opts.speed != null ? { speed: opts.speed } : {}),
-    }),
-  });
+  let ttsRes: Response;
+  try {
+    ttsRes = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: TTS_MODEL,
+        voice,
+        input: text,
+        response_format: 'mp3',
+        ...(opts.speed != null ? { speed: opts.speed } : {}),
+      }),
+    });
+  } catch (e) {
+    await notifyAdminFailure(env, 'openai', 'network_error', (e as Error).message);
+    throw e;
+  }
   if (!ttsRes.ok) {
     const detail = await ttsRes.text();
+    const kind = classifyError(ttsRes.status);
+    if (kind) await notifyAdminFailure(env, 'openai', kind, `${ttsRes.status}: ${detail.slice(0, 500)}`);
     throw new Error(`OpenAI TTS failed (${ttsRes.status}): ${detail.slice(0, 300)}`);
   }
   const audio = await ttsRes.arrayBuffer();
@@ -69,13 +78,21 @@ export async function synthesize(env: Env, text: string, opts: SynthOpts = {}): 
   // documented prompt cap; chars is a conservative proxy.
   form.append('prompt', text.slice(0, 224));
 
-  const whRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
+  let whRes: Response;
+  try {
+    whRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+  } catch (e) {
+    await notifyAdminFailure(env, 'openai', 'network_error', (e as Error).message);
+    throw e;
+  }
   if (!whRes.ok) {
     const detail = await whRes.text();
+    const kind = classifyError(whRes.status);
+    if (kind) await notifyAdminFailure(env, 'openai', kind, `${whRes.status}: ${detail.slice(0, 500)}`);
     throw new Error(`OpenAI Whisper failed (${whRes.status}): ${detail.slice(0, 300)}`);
   }
   const wh = (await whRes.json()) as WhisperResponse;

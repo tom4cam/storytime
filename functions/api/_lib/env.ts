@@ -16,6 +16,9 @@ export interface Env {
 
   // Public vars
   ANTHROPIC_MODEL?: string;
+
+  // Optional alerting (Resend). When unset, alerts log a warning and no-op.
+  RESEND_API_KEY?: string;
 }
 
 export function requireEnv(env: Env, key: keyof Env): string {
