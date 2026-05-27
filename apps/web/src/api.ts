@@ -18,7 +18,7 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 
 export async function createStory(
   answers: StoryAnswer[],
-  language: 'en' | 'sv',
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr',
   voiceId: string
 ): Promise<StoryVersion> {
   const res = await fetch(`${FN_BASE}/createStory`, {

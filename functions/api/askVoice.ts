@@ -8,17 +8,19 @@ import { badRequest, serverError } from './_lib/util';
 
 interface AskVoiceRequest {
   text: string;
-  language: 'en' | 'sv';
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
   voiceId?: string;
   speed?: number;
 }
+
+const VALID_LANGS = new Set(['en', 'sv', 'bg', 'es', 'fr']);
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let body: AskVoiceRequest;
   try { body = (await request.json()) as AskVoiceRequest; }
   catch (e) { return badRequest((e as Error).message || 'Bad JSON'); }
   if (!body.text || typeof body.text !== 'string') return badRequest('text required');
-  if (body.language !== 'en' && body.language !== 'sv') return badRequest('language must be en or sv');
+  if (!VALID_LANGS.has(body.language)) return badRequest('language must be one of: en, sv, bg, es, fr');
   if (body.text.length > 500) return badRequest('text too long (max 500 chars)');
   try {
     const { audio } = await synthesize(env, body.text, { voiceId: body.voiceId, speed: body.speed });

@@ -268,12 +268,10 @@ function renderParagraph(
   });
 }
 
-function formatDate(s: string, lang: 'en' | 'sv'): string {
+function formatDate(s: string, lang: 'en' | 'sv' | 'bg' | 'es' | 'fr'): string {
+  const LOCALES = { en: 'en-US', sv: 'sv-SE', bg: 'bg-BG', es: 'es-419', fr: 'fr-FR' } as const;
   try {
     const d = new Date(s);
-    const locale = lang === 'sv' ? 'sv-SE' : 'en-US';
-    return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return s;
-  }
+    return d.toLocaleDateString(LOCALES[lang], { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return s; }
 }

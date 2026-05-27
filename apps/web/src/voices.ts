@@ -1,4 +1,4 @@
-export type Lang = 'en' | 'sv';
+export type Lang = 'en' | 'sv' | 'bg' | 'es' | 'fr';
 
 export interface VoiceMeta {
   key: 'daniel' | 'rachel' | 'sanna' | 'adam';

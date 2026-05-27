@@ -10,9 +10,11 @@ import { badRequest, json, serverError } from './_lib/util';
 
 interface CreateStoryRequest {
   answers: StoryAnswer[];
-  language: 'en' | 'sv';
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
   voice_id?: string;
 }
+
+const VALID_LANGS = new Set(['en', 'sv', 'bg', 'es', 'fr']);
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let body: CreateStoryRequest;
@@ -20,7 +22,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   catch (e) { return badRequest((e as Error).message || 'Bad JSON'); }
 
   if (!Array.isArray(body.answers) || body.answers.length === 0) return badRequest('answers must be a non empty array');
-  if (body.language !== 'en' && body.language !== 'sv') return badRequest('language must be "en" or "sv"');
+  if (!VALID_LANGS.has(body.language)) return badRequest('language must be one of: en, sv, bg, es, fr');
   const trimmed = body.answers
     .filter((a) => a && typeof a.answer === 'string' && a.answer.trim().length > 0)
     .map((a) => ({ question: String(a.question || ''), answer: a.answer.trim() }));

@@ -33,7 +33,7 @@ const askCache = new Map<string, Blob>();
 let askAudio: HTMLAudioElement | null = null;
 
 export interface AskVoiceOpts {
-  language: 'en' | 'sv';
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
   voiceId: string;
   speed?: number;
 }

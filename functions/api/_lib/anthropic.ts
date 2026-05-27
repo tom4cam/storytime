@@ -31,9 +31,15 @@ JSON shape:
 
 Image prompts: describe one clear scene per paragraph in cartoon style, child friendly, around 20 words. Mention the main character and the setting each time so the illustrator stays consistent.`;
 
-const LANG_NAMES: Record<'en' | 'sv', string> = { en: 'English', sv: 'Swedish (svenska)' };
+const LANG_NAMES: Record<'en' | 'sv' | 'bg' | 'es' | 'fr', string> = {
+  en: 'English',
+  sv: 'Swedish',
+  bg: 'Bulgarian',
+  es: 'simple, warm Spanish (Latin American)',
+  fr: 'simple, warm French (European)',
+};
 
-export async function generateStory(env: Env, answers: StoryAnswer[], language: 'en' | 'sv'): Promise<GeneratedStory> {
+export async function generateStory(env: Env, answers: StoryAnswer[], language: 'en' | 'sv' | 'bg' | 'es' | 'fr'): Promise<GeneratedStory> {
   const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
   const client = new Anthropic({ apiKey });
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;

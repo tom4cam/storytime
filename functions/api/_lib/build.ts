@@ -30,7 +30,7 @@ export async function saveGeneratingStub(env: Env, opts: {
   id: string;
   version: number;
   sourceAnswers: StoryAnswer[];
-  language: 'en' | 'sv';
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
   voiceId?: string;
 }): Promise<StoryVersion> {
   const stub: StoryVersion = {
@@ -54,7 +54,7 @@ export async function saveFailedVersion(env: Env, opts: {
   version: number;
   sourceAnswers: StoryAnswer[];
   error: string;
-  language: 'en' | 'sv';
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
   voiceId?: string;
 }): Promise<void> {
   const rec: StoryVersion = {
@@ -78,7 +78,7 @@ interface BuildOptions {
   version: number;
   title?: string;
   sourceAnswers: StoryAnswer[];
-  language: 'en' | 'sv';
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
   voiceId?: string;
   summary?: string;
   paragraphs: { text: string; image_prompt?: string; image_url: string | null; regenerate_image?: boolean }[];
@@ -144,7 +144,7 @@ export async function buildFromAnswers(
   env: Env,
   id: string,
   answers: StoryAnswer[],
-  language: 'en' | 'sv',
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr',
   voiceId?: string
 ): Promise<StoryVersion> {
   await moderateAnswers(env, answers);
@@ -164,7 +164,7 @@ export async function buildFromAnswers(
   });
 }
 
-async function safelyGenerate(env: Env, answers: StoryAnswer[], language: 'en' | 'sv'): Promise<GeneratedStory> {
+async function safelyGenerate(env: Env, answers: StoryAnswer[], language: 'en' | 'sv' | 'bg' | 'es' | 'fr'): Promise<GeneratedStory> {
   const generated = await generateStory(env, answers, language);
   const fullText = `${generated.title}\n\n${generated.paragraphs.map((p) => p.text).join('\n\n')}`;
   const result = await moderate(env, fullText);

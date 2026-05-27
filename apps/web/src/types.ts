@@ -32,7 +32,7 @@ export interface StoryVersion {
   created_at: string;
   status: StoryStatus;
   error?: string;
-  language: 'en' | 'sv';
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
   narration_words?: WordTiming[];
   voice_id?: string;
   summary?: string;

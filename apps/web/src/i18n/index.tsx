@@ -2,14 +2,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { en, type StringKey } from './strings/en';
 import { sv } from './strings/sv';
 
-export type Lang = 'en' | 'sv';
+export type Lang = 'en' | 'sv' | 'bg' | 'es' | 'fr';
 const STORAGE_KEY = 'storyMaker.lang';
 
-const TABLES: Record<Lang, Record<StringKey, string>> = { en, sv };
+const TABLES: Record<Lang, Record<StringKey, string>> = { en, sv, bg: en, es: en, fr: en };
 
 export function resolveInitialLang(navigatorLang: string, stored: string | null): Lang {
-  if (stored === 'en' || stored === 'sv') return stored;
-  return navigatorLang.toLowerCase().startsWith('sv') ? 'sv' : 'en';
+  if (stored === 'en' || stored === 'sv' || stored === 'bg' || stored === 'es' || stored === 'fr') return stored;
+  const nav = navigatorLang.toLowerCase();
+  if (nav.startsWith('sv')) return 'sv';
+  if (nav.startsWith('bg')) return 'bg';
+  if (nav.startsWith('es')) return 'es';
+  if (nav.startsWith('fr')) return 'fr';
+  return 'en';
 }
 
 export function t(key: StringKey, lang: Lang, vars?: Record<string, string>): string {

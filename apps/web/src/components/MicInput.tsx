@@ -6,7 +6,7 @@ interface Props {
   onChange: (v: string) => void;
   placeholder?: string;
   ariaLabel: string;
-  language: 'en' | 'sv';
+  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
 }
 
 export function MicInput({ value, onChange, placeholder, ariaLabel, language }: Props) {
@@ -20,7 +20,8 @@ export function MicInput({ value, onChange, placeholder, ariaLabel, language }: 
   const startListening = () => {
     setError(null);
     setListening(true);
-    const sttLang = language === 'sv' ? 'sv-SE' : 'en-US';
+    const STT_LOCALES = { en: 'en-US', sv: 'sv-SE', bg: 'bg-BG', es: 'es-419', fr: 'fr-FR' } as const;
+    const sttLang = STT_LOCALES[language] ?? 'en-US';
     handleRef.current = listenOnce(
       (transcript) => {
         setListening(false);
