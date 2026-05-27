@@ -31,3 +31,6 @@ npm-debug.log*
 
 # Testing
 coverage/
+
+# Superpowers brainstorming mockups
+.superpowers/
