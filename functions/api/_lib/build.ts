@@ -32,6 +32,8 @@ export async function saveGeneratingStub(env: Env, opts: {
   sourceAnswers: StoryAnswer[];
   language: Lang;
   voiceId?: string;
+  creator_id?: string;
+  listed?: boolean;
 }): Promise<StoryVersion> {
   const stub: StoryVersion = {
     id: opts.id,
@@ -44,6 +46,8 @@ export async function saveGeneratingStub(env: Env, opts: {
     status: 'generating',
     language: opts.language,
     ...(opts.voiceId ? { voice_id: opts.voiceId } : {}),
+    ...(opts.creator_id ? { creator_id: opts.creator_id } : {}),
+    ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
   };
   await saveStoryVersion(env, stub);
   return stub;
@@ -56,6 +60,8 @@ export async function saveFailedVersion(env: Env, opts: {
   error: string;
   language: Lang;
   voiceId?: string;
+  creator_id?: string;
+  listed?: boolean;
 }): Promise<void> {
   const rec: StoryVersion = {
     id: opts.id,
@@ -69,6 +75,8 @@ export async function saveFailedVersion(env: Env, opts: {
     error: opts.error,
     language: opts.language,
     ...(opts.voiceId ? { voice_id: opts.voiceId } : {}),
+    ...(opts.creator_id ? { creator_id: opts.creator_id } : {}),
+    ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
   };
   await saveStoryVersion(env, rec);
 }
@@ -80,6 +88,8 @@ interface BuildOptions {
   sourceAnswers: StoryAnswer[];
   language: Lang;
   voiceId?: string;
+  creator_id?: string;
+  listed?: boolean;
   summary?: string;
   paragraphs: { text: string; image_prompt?: string; image_url: string | null; regenerate_image?: boolean }[];
 }
@@ -134,6 +144,8 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
     language: opts.language,
     narration_words: narration.words,
     ...(opts.voiceId ? { voice_id: opts.voiceId } : {}),
+    ...(opts.creator_id ? { creator_id: opts.creator_id } : {}),
+    ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
     ...(opts.summary && opts.summary.trim() ? { summary: opts.summary.trim() } : {}),
   };
   await saveStoryVersion(env, version);
@@ -145,7 +157,8 @@ export async function buildFromAnswers(
   id: string,
   answers: StoryAnswer[],
   language: Lang,
-  voiceId?: string
+  voiceId?: string,
+  creator_id?: string
 ): Promise<StoryVersion> {
   await moderateAnswers(env, answers);
   const generated = await safelyGenerate(env, answers, language);
@@ -156,11 +169,9 @@ export async function buildFromAnswers(
     sourceAnswers: answers,
     language,
     voiceId,
-    paragraphs: generated.paragraphs.map((p) => ({
-      text: p.text,
-      image_prompt: p.image_prompt,
-      image_url: null,
-    })),
+    creator_id,
+    listed: true,
+    paragraphs: generated.paragraphs.map((p) => ({ text: p.text, image_prompt: p.image_prompt, image_url: null })),
   });
 }
 

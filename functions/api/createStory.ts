@@ -5,6 +5,7 @@
 
 import type { Env } from './_lib/env';
 import { buildFromAnswers, ModerationError, moderateAnswers, saveFailedVersion, saveGeneratingStub } from './_lib/build';
+import { readCreatorId } from './_lib/creatorId';
 import { LANGS } from './_lib/types';
 import type { Lang, StoryAnswer } from './_lib/types';
 import { badRequest, json, serverError } from './_lib/util';
@@ -37,8 +38,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const voiceId = typeof body.voice_id === 'string' && body.voice_id ? body.voice_id : undefined;
+  const creator_id = readCreatorId(request) ?? undefined;
   const id = crypto.randomUUID();
-  try { await saveGeneratingStub(env, { id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId }); }
+  try { await saveGeneratingStub(env, { id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, creator_id, listed: true }); }
   catch (e) {
     console.error('saveGeneratingStub failed', e);
     return serverError((e as Error).message);
@@ -52,7 +54,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // background body on this configuration, leaving stories stuck in
   // "generating" forever.
   try {
-    const story = await buildFromAnswers(env, id, trimmed, body.language, voiceId);
+    const story = await buildFromAnswers(env, id, trimmed, body.language, voiceId, creator_id);
     return json(story, 200);
   } catch (e) {
     const message = e instanceof ModerationError
@@ -61,7 +63,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     console.error('build failed', e);
     try {
       await saveFailedVersion(env, {
-        id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, error: message,
+        id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, error: message, creator_id, listed: true,
       });
     } catch (saveErr) { console.error('Could not record failure state', saveErr); }
     if (e instanceof ModerationError) return json({ error: e.message }, 422);
