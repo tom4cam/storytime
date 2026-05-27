@@ -5,16 +5,17 @@
 
 import type { Env } from './_lib/env';
 import { buildFromAnswers, ModerationError, moderateAnswers, saveFailedVersion, saveGeneratingStub } from './_lib/build';
-import type { StoryAnswer } from './_lib/types';
+import { LANGS } from './_lib/types';
+import type { Lang, StoryAnswer } from './_lib/types';
 import { badRequest, json, serverError } from './_lib/util';
 
 interface CreateStoryRequest {
   answers: StoryAnswer[];
-  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
+  language: Lang;
   voice_id?: string;
 }
 
-const VALID_LANGS = new Set(['en', 'sv', 'bg', 'es', 'fr']);
+const VALID_LANGS = new Set(LANGS);
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let body: CreateStoryRequest;

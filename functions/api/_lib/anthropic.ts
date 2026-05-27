@@ -2,7 +2,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { Env } from './env';
-import type { GeneratedStory, StoryAnswer } from './types';
+import type { GeneratedStory, Lang, StoryAnswer } from './types';
 import { requireEnv } from './env';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
@@ -31,15 +31,15 @@ JSON shape:
 
 Image prompts: describe one clear scene per paragraph in cartoon style, child friendly, around 20 words. Mention the main character and the setting each time so the illustrator stays consistent.`;
 
-const LANG_NAMES: Record<'en' | 'sv' | 'bg' | 'es' | 'fr', string> = {
+const LANG_NAMES: Record<Lang, string> = {
   en: 'English',
-  sv: 'Swedish',
+  sv: 'Swedish (svenska)',
   bg: 'Bulgarian',
   es: 'simple, warm Spanish (Latin American)',
   fr: 'simple, warm French (European)',
 };
 
-export async function generateStory(env: Env, answers: StoryAnswer[], language: 'en' | 'sv' | 'bg' | 'es' | 'fr'): Promise<GeneratedStory> {
+export async function generateStory(env: Env, answers: StoryAnswer[], language: Lang): Promise<GeneratedStory> {
   const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
   const client = new Anthropic({ apiKey });
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;

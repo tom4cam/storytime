@@ -1,6 +1,9 @@
 // Mirror of apps/web/src/types.ts — kept here so functions are
 // self-contained for the Cloudflare bundler.
 
+export const LANGS = ['en', 'sv', 'bg', 'es', 'fr'] as const;
+export type Lang = typeof LANGS[number];
+
 export interface Paragraph {
   text: string;
   image_url: string | null;
@@ -32,7 +35,7 @@ export interface StoryVersion {
   created_at: string;
   status: StoryStatus;
   error?: string;
-  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
+  language: Lang;
   narration_words?: WordTiming[];
   voice_id?: string;
   summary?: string;

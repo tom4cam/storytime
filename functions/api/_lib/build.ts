@@ -7,7 +7,7 @@ import { synthesize } from './tts';
 import { generateImage } from './fal';
 import { moderate } from './moderation';
 import { saveStoryVersion, storeMedia } from './storage';
-import type { GeneratedStory, Paragraph, StoryAnswer, StoryVersion } from './types';
+import type { GeneratedStory, Lang, Paragraph, StoryAnswer, StoryVersion } from './types';
 import { charsToWords } from './words';
 
 export class ModerationError extends Error {
@@ -30,7 +30,7 @@ export async function saveGeneratingStub(env: Env, opts: {
   id: string;
   version: number;
   sourceAnswers: StoryAnswer[];
-  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
+  language: Lang;
   voiceId?: string;
 }): Promise<StoryVersion> {
   const stub: StoryVersion = {
@@ -54,7 +54,7 @@ export async function saveFailedVersion(env: Env, opts: {
   version: number;
   sourceAnswers: StoryAnswer[];
   error: string;
-  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
+  language: Lang;
   voiceId?: string;
 }): Promise<void> {
   const rec: StoryVersion = {
@@ -78,7 +78,7 @@ interface BuildOptions {
   version: number;
   title?: string;
   sourceAnswers: StoryAnswer[];
-  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
+  language: Lang;
   voiceId?: string;
   summary?: string;
   paragraphs: { text: string; image_prompt?: string; image_url: string | null; regenerate_image?: boolean }[];
@@ -144,7 +144,7 @@ export async function buildFromAnswers(
   env: Env,
   id: string,
   answers: StoryAnswer[],
-  language: 'en' | 'sv' | 'bg' | 'es' | 'fr',
+  language: Lang,
   voiceId?: string
 ): Promise<StoryVersion> {
   await moderateAnswers(env, answers);

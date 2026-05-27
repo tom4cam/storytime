@@ -5,6 +5,7 @@ import { AudioBar, type AudioBarRef } from '../components/AudioBar';
 import { deleteStory, getStory } from '../api';
 import { useAudioSync } from '../audioSync';
 import { useLang, useT } from '../i18n';
+import { LOCALES } from '../i18n/locales';
 import type { StoryVersion, WordTiming } from '../types';
 
 const POLL_INTERVAL_MS = 10000;
@@ -269,7 +270,6 @@ function renderParagraph(
 }
 
 function formatDate(s: string, lang: 'en' | 'sv' | 'bg' | 'es' | 'fr'): string {
-  const LOCALES = { en: 'en-US', sv: 'sv-SE', bg: 'bg-BG', es: 'es-419', fr: 'fr-FR' } as const;
   try {
     const d = new Date(s);
     return d.toLocaleDateString(LOCALES[lang], { month: 'short', day: 'numeric', year: 'numeric' });

@@ -3,17 +3,19 @@
 // Edge-cached for 24h.
 
 import type { Env } from './_lib/env';
+import { LANGS } from './_lib/types';
+import type { Lang } from './_lib/types';
 import { synthesize } from './_lib/tts';
 import { badRequest, serverError } from './_lib/util';
 
 interface AskVoiceRequest {
   text: string;
-  language: 'en' | 'sv' | 'bg' | 'es' | 'fr';
+  language: Lang;
   voiceId?: string;
   speed?: number;
 }
 
-const VALID_LANGS = new Set(['en', 'sv', 'bg', 'es', 'fr']);
+const VALID_LANGS = new Set(LANGS);
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let body: AskVoiceRequest;

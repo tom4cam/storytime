@@ -17,13 +17,23 @@ describe('resolveInitialLang', () => {
 
   it('falls back to English for anything else', () => {
     expect(resolveInitialLang('en-US', null)).toBe('en');
-    expect(resolveInitialLang('fr-FR', null)).toBe('en');
+    expect(resolveInitialLang('fr-FR', null)).toBe('fr');
     expect(resolveInitialLang('', null)).toBe('en');
   });
 
   it('ignores invalid stored values', () => {
-    expect(resolveInitialLang('sv-SE', 'fr')).toBe('sv');
+    expect(resolveInitialLang('sv-SE', 'xx')).toBe('sv');
     expect(resolveInitialLang('en-US', '')).toBe('en');
+  });
+
+  it('resolves browser locales for bg, es, and fr', () => {
+    expect(resolveInitialLang('bg', null)).toBe('bg');
+    expect(resolveInitialLang('es-MX', null)).toBe('es');
+    expect(resolveInitialLang('fr-CA', null)).toBe('fr');
+  });
+
+  it('honours a stored valid lang for any of the five codes', () => {
+    expect(resolveInitialLang('en-US', 'bg')).toBe('bg');
   });
 });
 

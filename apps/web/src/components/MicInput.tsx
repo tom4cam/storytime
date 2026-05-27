@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { LOCALES } from '../i18n/locales';
 import { listenOnce, speechRecognitionAvailable, type ListenHandle } from '../speech';
 
 interface Props {
@@ -20,8 +21,7 @@ export function MicInput({ value, onChange, placeholder, ariaLabel, language }: 
   const startListening = () => {
     setError(null);
     setListening(true);
-    const STT_LOCALES = { en: 'en-US', sv: 'sv-SE', bg: 'bg-BG', es: 'es-419', fr: 'fr-FR' } as const;
-    const sttLang = STT_LOCALES[language] ?? 'en-US';
+    const sttLang = LOCALES[language] ?? 'en-US';
     handleRef.current = listenOnce(
       (transcript) => {
         setListening(false);
