@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useT } from '../i18n';
 import { SettingsCog } from './SettingsCog';
+import { BookLogo } from './BookLogo';
 
 interface Props {
   children: ReactNode;
@@ -21,8 +22,11 @@ export function Layout({ children, showExit = false }: Props) {
     <div className="page">
       <div className="header">
         <Link to="/" className="brand">
-          {t('brand.name')}
-          <small>{t('brand.tagline')}</small>
+          <BookLogo size={44} className="brand-logo" />
+          <span className="brand-text">
+            {t('brand.name')}
+            <small>{t('brand.tagline')}</small>
+          </span>
         </Link>
         <div className="header-actions">
           {showExit && (
