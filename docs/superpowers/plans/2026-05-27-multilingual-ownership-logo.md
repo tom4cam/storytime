@@ -1877,6 +1877,259 @@ git push origin main
 
 ---
 
+---
+
+### Task 23: Admin email alerts for upstream API failures (Resend)
+
+Added 2026-05-27 after planning. Wraps every upstream HTTP call so a 429
+or 5xx fires a short email to the admin. R2-backed per-(provider, kind)
+cooldown keeps volume low. Resend is the email provider; the API key
+goes through a new optional `RESEND_API_KEY` secret.
+
+**Files:**
+- Create: `functions/api/_lib/alerts.ts`
+- Create: `functions/api/_lib/alerts.test.ts`
+- Modify: `functions/api/_lib/env.ts` (add `RESEND_API_KEY?: string`)
+- Modify: `functions/api/_lib/anthropic.ts` (wrap upstream calls)
+- Modify: `functions/api/_lib/tts.ts` (wrap upstream calls)
+- Modify: `functions/api/_lib/moderation.ts` (wrap upstream calls)
+- Modify: `functions/api/_lib/fal.ts` (wrap upstream calls)
+- Modify: `.env.example` (document new var)
+- Modify: `README.md` (document new var + Resend setup)
+
+- [ ] **Step 1: Add the env var slot**
+
+In `functions/api/_lib/env.ts`, inside the `Env` interface, add:
+```ts
+  // Optional alerting (Resend). When unset, alerts log a warning and no-op.
+  RESEND_API_KEY?: string;
+```
+
+- [ ] **Step 2: Write failing tests for cooldown logic**
+
+Create `functions/api/_lib/alerts.test.ts`:
+```ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { __shouldSendForTest, __markSentForTest, classifyError } from './alerts';
+
+function makeR2Stub() {
+  const store = new Map<string, string>();
+  return {
+    store,
+    async get(key: string) {
+      const v = store.get(key);
+      if (v === undefined) return null;
+      return { async text() { return v; } };
+    },
+    async put(key: string, value: string) { store.set(key, value); },
+  };
+}
+
+describe('alerts cooldown', () => {
+  let r2: ReturnType<typeof makeR2Stub>;
+  beforeEach(() => { r2 = makeR2Stub(); });
+
+  it('allows the first send for a new (provider, kind)', async () => {
+    expect(await __shouldSendForTest(r2 as never, 'openai', 'http_429')).toBe(true);
+  });
+
+  it('blocks repeat send inside the cooldown window', async () => {
+    await __markSentForTest(r2 as never, 'openai', 'http_429');
+    expect(await __shouldSendForTest(r2 as never, 'openai', 'http_429')).toBe(false);
+  });
+
+  it('allows send after the cooldown window passes', async () => {
+    const past = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    r2.store.set('alerts/last-openai-http_429.txt', past);
+    expect(await __shouldSendForTest(r2 as never, 'openai', 'http_429')).toBe(true);
+  });
+
+  it('separate (provider, kind) keys do not interfere', async () => {
+    await __markSentForTest(r2 as never, 'openai', 'http_429');
+    expect(await __shouldSendForTest(r2 as never, 'anthropic', 'http_429')).toBe(true);
+    expect(await __shouldSendForTest(r2 as never, 'openai', 'http_5xx')).toBe(true);
+  });
+});
+
+describe('classifyError', () => {
+  it('maps 429 to http_429', () => { expect(classifyError(429)).toBe('http_429'); });
+  it('maps 500 to http_5xx', () => { expect(classifyError(500)).toBe('http_5xx'); });
+  it('maps 503 to http_5xx', () => { expect(classifyError(503)).toBe('http_5xx'); });
+  it('returns null for 200', () => { expect(classifyError(200)).toBeNull(); });
+  it('returns null for 400', () => { expect(classifyError(400)).toBeNull(); });
+  it('maps a thrown error to network_error when no status', () => {
+    expect(classifyError(undefined, new Error('econnreset'))).toBe('network_error');
+  });
+});
+```
+
+- [ ] **Step 3: Run, confirm failure**
+
+Run: `cd apps/web && npx vitest run ../../functions/api/_lib/alerts.test.ts --reporter=basic`
+Expected: FAIL with `Failed to load url ./alerts`.
+
+- [ ] **Step 4: Implement alerts.ts**
+
+Create `functions/api/_lib/alerts.ts`:
+```ts
+// Admin alerts for upstream API failures. Sends an email via Resend
+// when an upstream returns 429/5xx or a network error escapes a fetch.
+//
+// Cooldown: one alert per (provider, kind) per hour, tracked in R2.
+// If RESEND_API_KEY is unset the alert is a no-op (logged warning).
+
+import type { Env } from './env';
+
+const ADMIN_EMAIL = 'caswell.tom@gmail.com';
+const SENDER = 'storytime alerts <onboarding@resend.dev>';
+const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+
+export type AlertKind = 'http_429' | 'http_5xx' | 'network_error';
+export type AlertProvider = 'anthropic' | 'openai' | 'fal';
+
+export function classifyError(status: number | undefined, err?: Error): AlertKind | null {
+  if (status === 429) return 'http_429';
+  if (status !== undefined && status >= 500 && status < 600) return 'http_5xx';
+  if (status === undefined && err) return 'network_error';
+  return null;
+}
+
+interface R2Lite {
+  get(key: string): Promise<{ text(): Promise<string> } | null>;
+  put(key: string, value: string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
+}
+
+function keyFor(provider: AlertProvider, kind: AlertKind): string {
+  return `alerts/last-${provider}-${kind}.txt`;
+}
+
+async function shouldSend(bucket: R2Lite, provider: AlertProvider, kind: AlertKind): Promise<boolean> {
+  const obj = await bucket.get(keyFor(provider, kind));
+  if (!obj) return true;
+  const last = await obj.text();
+  const lastMs = Date.parse(last);
+  if (Number.isNaN(lastMs)) return true;
+  return Date.now() - lastMs >= COOLDOWN_MS;
+}
+
+async function markSent(bucket: R2Lite, provider: AlertProvider, kind: AlertKind): Promise<void> {
+  await bucket.put(keyFor(provider, kind), new Date().toISOString(), {
+    httpMetadata: { contentType: 'text/plain' },
+  });
+}
+
+export async function notifyAdminFailure(
+  env: Env,
+  provider: AlertProvider,
+  kind: AlertKind,
+  detail: string
+): Promise<void> {
+  if (!env.RESEND_API_KEY) {
+    console.warn(`[alerts] skip (no RESEND_API_KEY): ${provider} ${kind} — ${detail.slice(0, 200)}`);
+    return;
+  }
+  try {
+    if (!(await shouldSend(env.STORIES as unknown as R2Lite, provider, kind))) return;
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: SENDER,
+        to: [ADMIN_EMAIL],
+        subject: `[storytime] ${provider} ${kind}`,
+        text:
+          `Provider: ${provider}\n` +
+          `Kind:     ${kind}\n` +
+          `Time:     ${new Date().toISOString()}\n` +
+          `Detail:\n${detail.slice(0, 2000)}`,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.warn(`[alerts] Resend rejected: ${res.status} ${body.slice(0, 200)}`);
+      return;
+    }
+    await markSent(env.STORIES as unknown as R2Lite, provider, kind);
+  } catch (e) {
+    console.warn(`[alerts] send failed: ${(e as Error).message}`);
+  }
+}
+
+// Exported only for tests.
+export const __shouldSendForTest = shouldSend;
+export const __markSentForTest = markSent;
+```
+
+- [ ] **Step 5: Run, confirm pass**
+
+Run: `cd apps/web && npx vitest run ../../functions/api/_lib/alerts.test.ts --reporter=basic`
+Expected: 10 tests pass.
+
+- [ ] **Step 6: Wrap each upstream provider**
+
+For each of `functions/api/_lib/anthropic.ts`, `tts.ts`, `moderation.ts`, `fal.ts`: at every `fetch(...)` call, after detecting a non-OK response (existing code does this), classify and notify:
+
+Pattern:
+```ts
+import { classifyError, notifyAdminFailure } from './alerts';
+// ...
+const res = await fetch(...);
+if (!res.ok) {
+  const detail = await res.text();
+  const kind = classifyError(res.status);
+  if (kind) await notifyAdminFailure(env, '<provider>', kind, `${res.status}: ${detail.slice(0, 500)}`);
+  throw new Error(`<existing message>`);
+}
+```
+
+Provider strings:
+- `anthropic.ts` → provider `'anthropic'`
+- `tts.ts` → provider `'openai'` (both TTS and Whisper calls)
+- `moderation.ts` → provider `'openai'`
+- `fal.ts` → provider `'fal'`
+
+Be precise: the existing throw messages and `detail.slice(0, 300)` truncations must stay unchanged. Only insert the alert call between the failure detection and the throw.
+
+For thrown/network errors (no res object), wrap the fetch in try/catch and notify with `kind = 'network_error'`:
+```ts
+let res: Response;
+try { res = await fetch(...); }
+catch (e) {
+  await notifyAdminFailure(env, '<provider>', 'network_error', (e as Error).message);
+  throw e;
+}
+```
+Apply this pattern only at the outermost fetch in each helper. Don't catch errors inside JSON parsing — those are bugs, not alerts.
+
+- [ ] **Step 7: Update env files + docs**
+
+In `.env.example`, append:
+```
+# Resend (admin alerting). Optional. If unset, upstream-API failure
+# alerts log to stderr instead of emailing.
+RESEND_API_KEY=
+```
+
+In `README.md`, under "Required environment variables", add to the Optional list:
+- `RESEND_API_KEY`: enables admin failure-alert emails (Resend). Send-from is `onboarding@resend.dev`; to use a custom domain, verify it in the Resend dashboard and update `SENDER` in `functions/api/_lib/alerts.ts`.
+
+- [ ] **Step 8: Typecheck + full tests**
+
+Run: `npm run typecheck && cd apps/web && npx vitest run --reporter=basic`
+Expected: PASS for typecheck and all tests (existing + new alerts tests).
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add functions/api/_lib/alerts.ts functions/api/_lib/alerts.test.ts functions/api/_lib/env.ts functions/api/_lib/anthropic.ts functions/api/_lib/tts.ts functions/api/_lib/moderation.ts functions/api/_lib/fal.ts .env.example README.md
+git commit -m "Add admin email alerts via Resend for upstream API failures"
+```
+
+---
+
 ## Self-review notes
 
 - Spec coverage: every spec section maps to one or more tasks above (model in T1+T2; creatorId server+client in T3+T8; create stamps in T4; delete enforcement in T5; listed filter in T6; updateStoryListing in T7; main.tsx seed in T9; i18n in T10+T11+T12; HomePage filter in T13; StoryPage owner-gated delete+listed in T14; translate helper in T15; translate endpoint in T16; translate UI in T17; logo in T18; share in T19; audio bar collapse in T20; backfill+verification in T21+T22).

@@ -361,3 +361,15 @@ new language's typical voice gender expectation) are accepted.
 3. Land the multilingual i18n + translateStory + UI changes.
 4. Re-deploy.
 5. Smoke-test all 5 languages on storytime-app.pages.dev.
+
+## Addendum (2026-05-27): admin email alerts
+
+Bolted into v3 as Task 23. When any upstream API call (Anthropic,
+OpenAI TTS+Whisper+moderation, Fal) returns 429 or 5xx, send a short
+email to the admin (`caswell.tom@gmail.com`) via Resend. A per-
+`(provider, kind)` cooldown stored in R2 keeps the alert volume low
+(at most one email per provider+kind per hour). New env var:
+`RESEND_API_KEY`. If unset, alerts log a warning and no-op so the app
+still works in environments without Resend configured. Initial sender
+is Resend's default `onboarding@resend.dev`; the user can verify a
+custom domain in Resend and swap later.
