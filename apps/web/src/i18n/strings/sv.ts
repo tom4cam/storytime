@@ -168,4 +168,18 @@ export const sv: Record<StringKey, string> = {
 
   // Errors
   'error.generic': 'Något gick fel. Försök igen.',
+
+  // Admin-only — English fallback is fine.
+  'story.adminBadge': 'Admin',
+  'story.adminDeleteVersion': 'Delete this version',
+  'story.adminDeleteVersionConfirm': 'Delete v{n}?',
+  'story.adminDeleteVersionBody': "This version, its pictures, and its audio will be removed. If it's the latest version, the story will roll back to the previous one.",
+  'story.adminForceDelete': 'Force-delete entire story',
+  'story.adminForceDeleteConfirm': 'Force-delete this story?',
+  'story.adminForceDeleteBody': 'All versions, pictures, and audio for this story will be removed. This bypasses the usual ownership check.',
+  'admin.confirmPrompt': 'Type {word} to confirm.',
+  'admin.confirmPlaceholder': 'Type the word here',
+  'admin.confirmWord': 'DELETE',
+  'admin.confirmGo': 'Delete',
+  'admin.confirmCancel': 'Cancel',
 };

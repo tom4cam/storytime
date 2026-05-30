@@ -132,5 +132,17 @@ export const fr = {
   "q.hero.simpler": "Qui est dans ton histoire ? Dis-moi son nom.",
   "q.setting.simpler": "Où ça se passe ?",
   "q.goal.simpler": "Qu'est-ce qu'il veut ?",
-  "error.generic": "Quelque chose s'est mal passé. Réessaie."
+  "error.generic": "Quelque chose s'est mal passé. Réessaie.",
+  "story.adminBadge": "Admin",
+  "story.adminDeleteVersion": "Delete this version",
+  "story.adminDeleteVersionConfirm": "Delete v{n}?",
+  "story.adminDeleteVersionBody": "This version, its pictures, and its audio will be removed. If it's the latest version, the story will roll back to the previous one.",
+  "story.adminForceDelete": "Force-delete entire story",
+  "story.adminForceDeleteConfirm": "Force-delete this story?",
+  "story.adminForceDeleteBody": "All versions, pictures, and audio for this story will be removed. This bypasses the usual ownership check.",
+  "admin.confirmPrompt": "Type {word} to confirm.",
+  "admin.confirmPlaceholder": "Type the word here",
+  "admin.confirmWord": "DELETE",
+  "admin.confirmGo": "Delete",
+  "admin.confirmCancel": "Cancel"
 } as const;

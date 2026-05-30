@@ -4,7 +4,7 @@ import { Layout } from '../components/Layout';
 import { MicInput } from '../components/MicInput';
 import { VoicePicker } from '../components/VoicePicker';
 import { HelpYesNo } from '../components/HelpYesNo';
-import { createStory, moderateText } from '../api';
+import { ApiError, createStory, moderateText } from '../api';
 import { cancelSpeech, speakBest, stopAskVoice } from '../speech';
 import { useLang, useT } from '../i18n';
 import type { Lang } from '../i18n';
@@ -290,6 +290,19 @@ export function CreatePage() {
       navigate(`/s/${story.id}`);
     } catch (e) {
       setSubmitting(false);
+      if (e instanceof ApiError && e.status === 422) {
+        // Moderation reject. Reset the wizard so the user can pick
+        // a safe theme from SAFE_CHIPS instead of seeing a raw error.
+        setStoryType(null);
+        setOpenerText('');
+        setAnswers({});
+        setCurrent('');
+        setQIndex(0);
+        setStepKind('opener');
+        setModRedirect(true);
+        setError(null);
+        return;
+      }
       setError((e as Error).message);
     }
   };

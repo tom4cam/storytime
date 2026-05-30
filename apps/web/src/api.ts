@@ -1,6 +1,23 @@
+import { getAdminToken } from './adminToken';
 import type { StoryAnswer, StorySummary, StoryVersion } from './types';
 
 const FN_BASE = '/api';
+
+function adminHeaders(): Record<string, string> {
+  const t = getAdminToken();
+  return t ? { 'X-Admin-Token': t } : {};
+}
+
+export class ApiError extends Error {
+  status: number;
+  detail: string;
+  constructor(status: number, detail: string) {
+    super(`Request failed (${status}): ${detail}`);
+    this.name = 'ApiError';
+    this.status = status;
+    this.detail = detail;
+  }
+}
 
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -11,7 +28,7 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
     } catch {
       detail = await res.text();
     }
-    throw new Error(`Request failed (${res.status}): ${detail}`);
+    throw new ApiError(res.status, detail);
   }
   return res.json() as Promise<T>;
 }
@@ -77,7 +94,7 @@ export async function updateStoryListing(id: string, listed: boolean): Promise<S
 export async function deleteStory(id: string): Promise<void> {
   const res = await fetch(`${FN_BASE}/deleteStory`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders() },
     body: JSON.stringify({ id }),
   });
   if (!res.ok) {
@@ -86,6 +103,22 @@ export async function deleteStory(id: string): Promise<void> {
     catch { detail = await res.text(); }
     throw new Error(`Delete failed (${res.status}): ${detail}`);
   }
+}
+
+export interface DeleteVersionResponse {
+  ok: true;
+  removedStory: boolean;
+  newLatest?: number;
+  mediaDeleted: number;
+}
+
+export async function deleteStoryVersion(id: string, version: number): Promise<DeleteVersionResponse> {
+  const res = await fetch(`${FN_BASE}/deleteStoryVersion`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+    body: JSON.stringify({ id, version }),
+  });
+  return jsonOrThrow<DeleteVersionResponse>(res);
 }
 
 export async function translateStory(

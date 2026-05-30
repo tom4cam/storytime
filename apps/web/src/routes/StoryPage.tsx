@@ -3,8 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { AudioBar, type AudioBarRef } from '../components/AudioBar';
 import { ShareButton } from '../components/ShareButton';
-import { deleteStory, getStory, translateStory as apiTranslate, updateStoryListing } from '../api';
+import { deleteStory, deleteStoryVersion, getStory, translateStory as apiTranslate, updateStoryListing } from '../api';
 import { getCreatorId } from '../creatorId';
+import { isAdmin } from '../adminToken';
+import { ConfirmTyped } from '../components/ConfirmTyped';
 import { useAudioSync } from '../audioSync';
 import { useLang, useT } from '../i18n';
 import { LOCALES } from '../i18n/locales';
@@ -29,6 +31,9 @@ export function StoryPage() {
   const lastScrolledParaRef = useRef<number>(-1);
   const myId = getCreatorId();
   const isOwner = !!story?.creator_id && story.creator_id !== 'system' && story.creator_id === myId;
+  const admin = isAdmin();
+  const [adminAction, setAdminAction] = useState<null | { kind: 'version'; version: number } | { kind: 'story' }>(null);
+  const [adminError, setAdminError] = useState<string | null>(null);
   const [listed, setListedLocal] = useState<boolean>(story?.listed !== false);
   const [listingError, setListingError] = useState<string | null>(null);
   const [translatePickerOpen, setTranslatePickerOpen] = useState(false);
@@ -177,6 +182,22 @@ export function StoryPage() {
         </div>
       )}
 
+      {admin && (
+        <div className="row no-print" style={{ justifyContent: 'center', marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
+          <span className="subtle">{t('story.adminBadge')}:</span>
+          {versionLinks.map((v) => (
+            <button
+              key={v}
+              type="button"
+              className="btn danger-ghost"
+              onClick={() => { setAdminError(null); setAdminAction({ kind: 'version', version: v }); }}
+            >
+              {t('story.adminDeleteVersion')} (v{v})
+            </button>
+          ))}
+        </div>
+      )}
+
       {story.paragraphs.map((p, i) => (
         <div className={`paragraph ${i % 2 === 1 ? 'flip' : ''}`} key={i} data-para={i}>
           <div className="p-image">
@@ -252,6 +273,64 @@ export function StoryPage() {
       )}
 
       {listingError && <div className="error">{listingError}</div>}
+
+      {admin && !adminAction && (
+        <div className="row no-print" style={{ justifyContent: 'center', marginTop: 12 }}>
+          <button
+            type="button"
+            className="btn danger-ghost"
+            onClick={() => { setAdminError(null); setAdminAction({ kind: 'story' }); }}
+          >
+            {t('story.adminForceDelete')}
+          </button>
+        </div>
+      )}
+
+      {adminError && <div className="error">{adminError}</div>}
+
+      {admin && adminAction?.kind === 'version' && (
+        <ConfirmTyped
+          title={t('story.adminDeleteVersionConfirm', { n: String(adminAction.version) })}
+          body={t('story.adminDeleteVersionBody')}
+          onCancel={() => setAdminAction(null)}
+          onConfirm={async () => {
+            if (!story) return;
+            try {
+              const result = await deleteStoryVersion(story.id, adminAction.version);
+              if (result.removedStory) {
+                navigate('/');
+                return;
+              }
+              // Navigate to the new latest (or stay on the still-existing one).
+              if (result.newLatest !== undefined) {
+                navigate(`/s/${story.id}`);
+              }
+              setAdminAction(null);
+            } catch (e) {
+              setAdminError((e as Error).message);
+              throw e;
+            }
+          }}
+        />
+      )}
+
+      {admin && adminAction?.kind === 'story' && (
+        <ConfirmTyped
+          title={t('story.adminForceDeleteConfirm')}
+          body={t('story.adminForceDeleteBody')}
+          onCancel={() => setAdminAction(null)}
+          onConfirm={async () => {
+            if (!story) return;
+            try {
+              await deleteStory(story.id);
+              navigate('/');
+            } catch (e) {
+              setAdminError((e as Error).message);
+              throw e;
+            }
+          }}
+        />
+      )}
 
       {isOwner && confirmingDelete && (
         <div className="card delete-confirm no-print" style={{ marginTop: 16 }}>

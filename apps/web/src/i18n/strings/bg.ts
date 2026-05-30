@@ -132,5 +132,17 @@ export const bg = {
   "q.hero.simpler": "Кой е в историята ти? Кажи ми името му.",
   "q.setting.simpler": "Къде се случва?",
   "q.goal.simpler": "Какво искат?",
-  "error.generic": "Нещо се обърка. Моля, опитай отново."
+  "error.generic": "Нещо се обърка. Моля, опитай отново.",
+  "story.adminBadge": "Admin",
+  "story.adminDeleteVersion": "Delete this version",
+  "story.adminDeleteVersionConfirm": "Delete v{n}?",
+  "story.adminDeleteVersionBody": "This version, its pictures, and its audio will be removed. If it's the latest version, the story will roll back to the previous one.",
+  "story.adminForceDelete": "Force-delete entire story",
+  "story.adminForceDeleteConfirm": "Force-delete this story?",
+  "story.adminForceDeleteBody": "All versions, pictures, and audio for this story will be removed. This bypasses the usual ownership check.",
+  "admin.confirmPrompt": "Type {word} to confirm.",
+  "admin.confirmPlaceholder": "Type the word here",
+  "admin.confirmWord": "DELETE",
+  "admin.confirmGo": "Delete",
+  "admin.confirmCancel": "Cancel"
 } as const;

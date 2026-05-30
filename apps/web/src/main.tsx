@@ -8,9 +8,11 @@ import { EditPage } from './routes/EditPage';
 import { NotFoundPage } from './routes/NotFoundPage';
 import { LangProvider } from './i18n';
 import { getCreatorId } from './creatorId';
+import { installAdminTokenFromUrl } from './adminToken';
 import './styles.css';
 
 getCreatorId(); // ensure the cookie+localStorage are seeded on first visit
+installAdminTokenFromUrl(); // lift `?admin=<token>` into localStorage
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

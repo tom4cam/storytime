@@ -19,6 +19,10 @@ export interface Env {
 
   // Optional alerting (Resend). When unset, alerts log a warning and no-op.
   RESEND_API_KEY?: string;
+
+  // Optional admin override. When set, requests presenting a matching
+  // X-Admin-Token header bypass cookie-based ownership checks on delete.
+  ADMIN_TOKEN?: string;
 }
 
 export function requireEnv(env: Env, key: keyof Env): string {

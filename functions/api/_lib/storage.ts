@@ -113,3 +113,75 @@ export async function deleteStoryAndMedia(env: Env, id: string): Promise<{ story
   await Promise.all(mediaList.objects.map((o) => env.MEDIA.delete(o.key)));
   return { story: storyList.objects.length, media: mediaList.objects.length };
 }
+
+// Result of deleting a single version. `removedStory` is true when no
+// versions remained and the entire story was hard-deleted.
+export interface DeleteVersionResult {
+  removedStory: boolean;
+  newLatest?: number;
+  mediaDeleted: number;
+}
+
+// Delete one version of a story. If it was the latest version, re-derive
+// `index.json` from the highest remaining version (carrying its title,
+// cover image, status, listed flag). If no versions remain, hard-delete
+// the entire story.
+export async function deleteOneStoryVersion(env: Env, id: string, version: number): Promise<DeleteVersionResult> {
+  const versionKey = `${id}/v${version}.json`;
+  const existing = await env.STORIES.get(versionKey);
+  if (!existing) {
+    throw new Error(`version ${version} not found for story ${id}`);
+  }
+
+  // Delete the version blob and its media (prefix is `{id}-v{n}-` for
+  // paragraph images plus the exact `{id}-v{n}.mp3` for narration).
+  // R2 delete is idempotent — missing keys no-op.
+  await env.STORIES.delete(versionKey);
+  const mediaPrefixed = await env.MEDIA.list({ prefix: `${id}-v${version}-`, limit: 1000 });
+  await Promise.all(mediaPrefixed.objects.map((o) => env.MEDIA.delete(o.key)));
+  await env.MEDIA.delete(`${id}-v${version}.mp3`);
+  const mediaDeleted = mediaPrefixed.objects.length + 1;
+
+  // Find remaining versions to decide what to do with the index.
+  const remaining = await env.STORIES.list({ prefix: `${id}/v`, limit: 1000 });
+  const versionNumbers = remaining.objects
+    .map((o) => {
+      const m = /\/v(\d+)\.json$/.exec(o.key);
+      return m ? parseInt(m[1], 10) : NaN;
+    })
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+
+  if (versionNumbers.length === 0) {
+    // No versions left — drop the index too. Any orphaned media will
+    // be swept by deleteStoryAndMedia's prefix delete.
+    await env.STORIES.delete(`${id}/index.json`);
+    const orphan = await deleteStoryAndMedia(env, id);
+    return { removedStory: true, mediaDeleted: mediaDeleted + orphan.media };
+  }
+
+  const highest = versionNumbers[versionNumbers.length - 1];
+  const idx = await getStoryIndex(env, id);
+  if (idx && idx.latest_version === version) {
+    // Re-derive the index from the new highest version.
+    const newLatestObj = await env.STORIES.get(`${id}/v${highest}.json`);
+    if (newLatestObj) {
+      const newLatest = (await newLatestObj.json()) as StoryVersion;
+      const next: StoryIndex = {
+        id,
+        title: newLatest.title,
+        latest_version: highest,
+        cover_image_url: newLatest.paragraphs[0]?.image_url ?? null,
+        updated_at: newLatest.created_at,
+        created_at: idx.created_at,
+        status: newLatest.status,
+        ...(newLatest.creator_id ? { creator_id: newLatest.creator_id } : {}),
+        ...(newLatest.listed !== undefined ? { listed: newLatest.listed } : {}),
+      };
+      await env.STORIES.put(`${id}/index.json`, JSON.stringify(next), {
+        httpMetadata: { contentType: 'application/json' },
+      });
+    }
+  }
+  return { removedStory: false, newLatest: highest, mediaDeleted };
+}
