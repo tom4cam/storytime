@@ -16,7 +16,8 @@
     "seed:samples": "tsx --env-file-if-exists=.env scripts/seed-voice-samples.ts",
     "revert": "tsx --env-file-if-exists=.env scripts/revert-story.ts",
     "translate:i18n": "tsx --env-file-if-exists=.env scripts/translate-i18n.ts",
-    "backfill:system": "tsx --env-file-if-exists=.env scripts/backfill-system-stories.ts"
+    "backfill:system": "tsx --env-file-if-exists=.env scripts/backfill-system-stories.ts",
+    "cleanup:media": "tsx --env-file-if-exists=.env scripts/cleanup-orphaned-media.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",
