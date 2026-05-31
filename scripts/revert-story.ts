@@ -32,15 +32,20 @@ async function main() {
   }
   await saveStoryVersion(env, v); // overwrites index.json so latest_version=target
 
-  // Delete any later versions.
-  let n = target + 1;
-  while (true) {
-    const key = `${id}/v${n}.json`;
-    const exists = await env.STORIES.get(key);
-    if (!exists) break;
-    await env.STORIES.delete(key);
-    console.log(`  deleted ${key}`);
-    n += 1;
+  // Delete any later versions. List with prefix so non-contiguous
+  // numbering (e.g. after per-version admin deletes) doesn't fool us
+  // into stopping at the first gap.
+  const listed = await env.STORIES.list({ prefix: `${id}/`, limit: 1000 });
+  const versionKeyRe = /^v(\d+)\.json$/;
+  for (const obj of listed.objects) {
+    const name = obj.key.slice(id.length + 1);
+    const m = versionKeyRe.exec(name);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (n > target) {
+      await env.STORIES.delete(obj.key);
+      console.log(`  deleted ${obj.key}`);
+    }
   }
   console.log(`Reverted "${id}" to v${target}.`);
 }
