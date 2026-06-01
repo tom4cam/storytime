@@ -131,11 +131,27 @@ export function groupStoryIndexes(
     else buckets.set(key, { groupId: idx.group_id ?? null, members: [idx] });
   }
 
+  // series_id -> count of distinct positions among all indexes that share it.
+  // Each series member is its own translation-group; the series can span groups.
+  const seriesPositions = new Map<string, Set<number>>();
+  for (const idx of indexes) {
+    if (!idx.series_id || idx.series_position === undefined) continue;
+    const set = seriesPositions.get(idx.series_id) ?? new Set<number>();
+    set.add(idx.series_position);
+    seriesPositions.set(idx.series_id, set);
+  }
+
   const groups: StoryGroupSummary[] = [];
   for (const { groupId, members } of buckets.values()) {
     const primary = pickPrimary(members, preferredLang);
     const languages = [...new Set(members.map((m) => m.language))];
-    groups.push({ group_id: groupId, primary, languages });
+    const series_count = primary.series_id ? seriesPositions.get(primary.series_id)?.size : undefined;
+    groups.push({
+      group_id: groupId,
+      primary,
+      languages,
+      ...(series_count && series_count > 1 ? { series_count } : {}),
+    });
   }
 
   groups.sort((a, b) => (b.primary.updated_at || '').localeCompare(a.primary.updated_at || ''));

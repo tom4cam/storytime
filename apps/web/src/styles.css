@@ -769,7 +769,19 @@ ul.answer-list li b { color: var(--ink-soft); }
 .star--on { color: var(--sun); }
 .star:hover { color: var(--accent-deep); }
 
-.tile-stars { color: var(--sun); margin-top: 4px; letter-spacing: 2px; }
+.tile-stars { color: var(--sun); margin-top: 4px; letter-spacing: 2px; font-size: 18px; line-height: 1; }
+.tile-version { color: var(--ink-soft); font-size: 13px; margin-top: 8px; }
+.tile-series {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--leaf);
+  font-weight: 800;
+  font-size: 12px;
+  margin-top: 6px;
+}
 
 /* Series */
 .series-badge {

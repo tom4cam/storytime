@@ -88,12 +88,6 @@ export function HomePage() {
               </div>
               <div className="meta">
                 <b>{g.primary.title}</b>
-                <span>v{g.primary.latest_version}</span>
-                {g.primary.stars && (
-                  <span className="tile-stars" aria-label={`Rated ${g.primary.stars} of 5`}>
-                    {'★'.repeat(g.primary.stars)}{'☆'.repeat(5 - g.primary.stars)}
-                  </span>
-                )}
                 {g.languages.length > 1 && (
                   <span className="flag-row" aria-label={`Available languages: ${g.languages.join(', ')}`}>
                     {g.languages.map((l) => (
@@ -107,6 +101,20 @@ export function HomePage() {
                     ))}
                   </span>
                 )}
+                <span
+                  className="tile-stars"
+                  aria-label={g.primary.stars ? `Rated ${g.primary.stars} of 5` : 'Not rated'}
+                >
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <span key={n}>{(g.primary.stars ?? 0) >= n ? '★' : '☆'}</span>
+                  ))}
+                </span>
+                {g.series_count && g.series_count > 1 && g.primary.series_position && (
+                  <span className="tile-series" aria-label={`Part ${g.primary.series_position} of ${g.series_count}`}>
+                    Part {g.primary.series_position} of {g.series_count}
+                  </span>
+                )}
+                <span className="tile-version">v{g.primary.latest_version}</span>
               </div>
             </Link>
           ))}

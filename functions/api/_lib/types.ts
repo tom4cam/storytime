@@ -78,4 +78,5 @@ export interface StoryGroupSummary {
   group_id: string | null;
   primary: StoryIndex;
   languages: Lang[];
+  series_count?: number;  // when primary is part of a series; total distinct positions
 }
