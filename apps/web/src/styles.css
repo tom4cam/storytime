@@ -707,3 +707,8 @@ ul.answer-list li b { color: var(--ink-soft); }
 }
 .flag-row .flag { opacity: 0.6; font-size: 16px; }
 .flag-row .flag--current { opacity: 1; font-size: 22px; }
+.flag-row a.flag {
+  text-decoration: none;
+  cursor: pointer;
+}
+.flag-row a.flag:hover { opacity: 1; }

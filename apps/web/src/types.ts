@@ -76,3 +76,7 @@ export interface StoryGroupSummary {
   primary: StoryIndex;
   languages: Lang[];
 }
+
+export interface StoryVersionWithSiblings extends StoryVersion {
+  siblings: Array<{ id: string; language: Lang }>;
+}

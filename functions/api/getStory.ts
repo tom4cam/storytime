@@ -1,7 +1,8 @@
 // GET /api/getStory?id=...&version=...
 
 import type { Env } from './_lib/env';
-import { getStoryVersion } from './_lib/storage';
+import { getStoryVersion, listStoryIndexes } from './_lib/storage';
+import type { Lang } from './_lib/types';
 import { badRequest, json, notFound } from './_lib/util';
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -12,5 +13,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const version = versionStr ? parseInt(versionStr, 10) : undefined;
   const story = await getStoryVersion(env, id, version);
   if (!story) return notFound('Story not found.');
-  return json(story);
+
+  let siblings: Array<{ id: string; language: Lang }> = [];
+  if (story.group_id) {
+    const indexes = await listStoryIndexes(env);
+    siblings = indexes
+      .filter((i) => i.group_id === story.group_id && i.id !== story.id)
+      .map((i) => ({ id: i.id, language: i.language }));
+  }
+
+  return json({ ...story, siblings });
 };

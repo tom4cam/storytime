@@ -10,7 +10,8 @@ import { ConfirmTyped } from '../components/ConfirmTyped';
 import { useAudioSync } from '../audioSync';
 import { useLang, useT } from '../i18n';
 import { LOCALES } from '../i18n/locales';
-import type { StoryVersion, WordTiming } from '../types';
+import { LANG_FLAG } from '../lang';
+import type { Lang, StoryVersionWithSiblings, WordTiming } from '../types';
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -19,7 +20,7 @@ export function StoryPage() {
   const { lang } = useLang();
   const navigate = useNavigate();
   const { id, version } = useParams<{ id: string; version?: string }>();
-  const [story, setStory] = useState<StoryVersion | null>(null);
+  const [story, setStory] = useState<StoryVersionWithSiblings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -164,6 +165,23 @@ export function StoryPage() {
   return (
     <Layout showExit>
       <h1 className="story-title">{story.title}</h1>
+      {story.siblings.length > 0 && (
+        <div className="flag-row" aria-label="Switch language">
+          <span className="flag flag--current" aria-hidden="true">
+            {LANG_FLAG[story.language as Lang]}
+          </span>
+          {story.siblings.map((s) => (
+            <Link
+              key={s.id}
+              to={`/s/${s.id}`}
+              className="flag"
+              aria-label={`Switch to ${s.language}`}
+            >
+              {LANG_FLAG[s.language]}
+            </Link>
+          ))}
+        </div>
+      )}
       <div className="story-meta">
         {t('story.versionPrefix')} {story.version} ({t('story.savedPrefix')} {formatDate(story.created_at, lang)})
       </div>
