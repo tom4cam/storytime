@@ -804,12 +804,19 @@ ul.answer-list li b { color: var(--ink-soft); }
 .star--on { color: var(--sun); }
 .star:hover { color: var(--accent-deep); }
 
-.tile-stars { color: var(--sun); margin-top: 8px; letter-spacing: 2px; font-size: 24px; line-height: 1; }
+.tile-stars {
+  display: block;
+  color: var(--sun);
+  margin-top: 10px;
+  letter-spacing: 3px;
+  font-size: 30px;
+  line-height: 1;
+}
 
-/* Flags on home tiles: a notch smaller than before since stars sit above them */
-.recent-card .flag-row { gap: 8px; margin-top: 8px; }
-.recent-card .flag-row .flag { font-size: 30px; }
-.recent-card .flag-row .flag--current { font-size: 42px; }
+/* Flags on home tiles: smaller than the stars, on their own line under them */
+.recent-card .flag-row { display: flex; gap: 6px; margin-top: 10px; }
+.recent-card .flag-row .flag { font-size: 24px; }
+.recent-card .flag-row .flag--current { font-size: 32px; }
 
 .tile-series {
   display: inline-block;
