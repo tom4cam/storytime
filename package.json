@@ -18,6 +18,7 @@
     "translate:i18n": "tsx --env-file-if-exists=.env scripts/translate-i18n.ts",
     "backfill:system": "tsx --env-file-if-exists=.env scripts/backfill-system-stories.ts",
     "cleanup:media": "tsx --env-file-if-exists=.env scripts/cleanup-orphaned-media.ts",
+    "backfill:index-language": "tsx --env-file-if-exists=.env scripts/backfill-index-language.ts",
     "take-ownership": "tsx --env-file-if-exists=.env scripts/take-ownership.ts"
   },
   "devDependencies": {
