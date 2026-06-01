@@ -84,6 +84,39 @@ export async function notifyAdminFailure(
   }
 }
 
+// Send a one-off admin email (no cooldown). Subject and text are caller-supplied.
+export async function sendAdminEmail(
+  env: Env,
+  subject: string,
+  text: string,
+): Promise<void> {
+  if (!env.RESEND_API_KEY) {
+    console.warn(`[alerts] skip sendAdminEmail (no RESEND_API_KEY): ${subject}`);
+    return;
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: SENDER,
+        to: [ADMIN_EMAIL],
+        subject,
+        text,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.warn(`[alerts] Resend rejected: ${res.status} ${body.slice(0, 200)}`);
+    }
+  } catch (e) {
+    console.warn(`[alerts] sendAdminEmail failed: ${(e as Error).message}`);
+  }
+}
+
 // Exported only for tests.
 export const __shouldSendForTest = shouldSend;
 export const __markSentForTest = markSent;

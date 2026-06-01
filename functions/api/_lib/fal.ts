@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { requireEnv } from './env';
 import { classifyError, notifyAdminFailure } from './alerts';
+import { recordCost } from './costs';
 
 interface FalImageResponse {
   images: Array<{ url: string; content_type?: string }>;
@@ -39,5 +40,7 @@ export async function generateImage(env: Env, prompt: string): Promise<{ data: A
   if (!imgRes.ok) throw new Error(`Could not download Fal image (${imgRes.status})`);
   const data = await imgRes.arrayBuffer();
   const contentType = body.images[0].content_type || imgRes.headers.get('content-type') || 'image/png';
+  // Fal flux/schnell: $0.02 per image.
+  void recordCost(env, 'fal', 'image', 0.02);
   return { data, contentType };
 }

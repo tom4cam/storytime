@@ -7,6 +7,7 @@ import { synthesize } from './tts';
 import { generateImage } from './fal';
 import { moderate } from './moderation';
 import { saveStoryVersion, storeMedia } from './storage';
+import { notifyAdminFailure } from './alerts';
 import type { GeneratedStory, Lang, Paragraph, StoryAnswer, StoryVersion } from './types';
 import { charsToWords } from './words';
 
@@ -190,6 +191,14 @@ async function safelyGenerate(env: Env, answers: StoryAnswer[], language: Lang, 
   const fullText = `${generated.title}\n\n${generated.paragraphs.map((p) => p.text).join('\n\n')}`;
   const result = await moderate(env, fullText);
   if (result.flagged) {
+    // Notify admin that generated story content was flagged by moderation.
+    void notifyAdminFailure(env, 'anthropic', 'http_5xx',
+      `[storytime] Story hidden by moderation\n` +
+      `Reasons: ${result.reasons.join(', ')}\n` +
+      `Title: ${generated.title}\n` +
+      `Language: ${language}\n` +
+      `Text preview:\n${fullText.slice(0, 500)}`
+    );
     throw new ModerationError('The story came out a little off. Try asking again with different details.');
   }
   return generated;

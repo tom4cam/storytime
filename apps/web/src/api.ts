@@ -134,3 +134,70 @@ export async function translateStory(
   });
   return jsonOrThrow<StoryVersion>(res);
 }
+
+// --- Admin API (requires X-Admin-Token header) ---
+
+export interface MonthlyCosts {
+  month: string;
+  total_usd: number;
+  by_provider: { anthropic: number; openai: number; fal: number };
+  by_kind: { story_gen: number; translation: number; tts: number; image: number; moderation: number };
+  count_by_kind: { story_gen: number; translation: number; tts: number; image: number; moderation: number };
+  cost_alerted: boolean;
+  updated_at: string;
+}
+
+export interface FlaggedStorySummary {
+  id: string;
+  title: string;
+  language: string;
+  created_at: string;
+  creator_id: string | null;
+  status: string;
+  error?: string;
+}
+
+function adminAuthHeaders(token: string): Record<string, string> {
+  return { 'X-Admin-Token': token, 'Content-Type': 'application/json' };
+}
+
+export async function adminGetCosts(token: string): Promise<{ costs: MonthlyCosts; cap_usd: number }> {
+  const res = await fetch(`${FN_BASE}/_admin/costs`, {
+    headers: { 'X-Admin-Token': token },
+  });
+  return jsonOrThrow(res);
+}
+
+export async function adminResetCosts(token: string): Promise<{ ok: boolean; costs: MonthlyCosts }> {
+  const res = await fetch(`${FN_BASE}/_admin/resetCosts`, {
+    method: 'POST',
+    headers: adminAuthHeaders(token),
+    body: '{}',
+  });
+  return jsonOrThrow(res);
+}
+
+export async function adminListFlagged(token: string): Promise<{ flagged: FlaggedStorySummary[] }> {
+  const res = await fetch(`${FN_BASE}/_admin/listFlagged`, {
+    headers: { 'X-Admin-Token': token },
+  });
+  return jsonOrThrow(res);
+}
+
+export async function adminRestoreStory(token: string, id: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`${FN_BASE}/_admin/restoreStory`, {
+    method: 'POST',
+    headers: adminAuthHeaders(token),
+    body: JSON.stringify({ id }),
+  });
+  return jsonOrThrow(res);
+}
+
+export async function adminDeleteStory(token: string, id: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`${FN_BASE}/deleteStory`, {
+    method: 'POST',
+    headers: adminAuthHeaders(token),
+    body: JSON.stringify({ id }),
+  });
+  return jsonOrThrow(res);
+}

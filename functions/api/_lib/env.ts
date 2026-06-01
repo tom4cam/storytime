@@ -23,6 +23,10 @@ export interface Env {
   // Optional admin override. When set, requests presenting a matching
   // X-Admin-Token header bypass cookie-based ownership checks on delete.
   ADMIN_TOKEN?: string;
+
+  // Monthly spend cap in USD (default 10). When total_usd crosses this
+  // threshold a one-time Resend alert is sent.
+  MONTHLY_COST_LIMIT_USD?: string;
 }
 
 export function requireEnv(env: Env, key: keyof Env): string {

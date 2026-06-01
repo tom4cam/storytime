@@ -12,6 +12,7 @@ import type { Env } from './env';
 import type { CharacterAlignment } from './words';
 import { requireEnv } from './env';
 import { classifyError, notifyAdminFailure } from './alerts';
+import { recordCost } from './costs';
 
 const TTS_MODEL = 'tts-1';
 const STT_MODEL = 'whisper-1';
@@ -98,6 +99,8 @@ export async function synthesize(env: Env, text: string, opts: SynthOpts = {}): 
   const wh = (await whRes.json()) as WhisperResponse;
 
   const alignment = alignWhisperToSource(text, wh.words ?? [], { totalDuration: wh.duration });
+  // OpenAI TTS-1: $15 / 1_000_000 chars.
+  void recordCost(env, 'openai', 'tts', text.length * 15e-6);
   return { audio, alignment };
 }
 

@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { requireEnv } from './env';
 import { classifyError, notifyAdminFailure } from './alerts';
+import { recordCost } from './costs';
 
 interface ModerationResult { flagged: boolean; reasons: string[] }
 interface OpenAIModerationResponse { results: Array<{ flagged: boolean; categories: Record<string, boolean> }> }
@@ -29,5 +30,7 @@ export async function moderate(env: Env, text: string): Promise<ModerationResult
   const first = body.results?.[0];
   if (!first) return { flagged: false, reasons: [] };
   const reasons = Object.entries(first.categories || {}).filter(([, v]) => !!v).map(([k]) => k);
+  // OpenAI moderation is free — record $0 so call counts appear in the dashboard.
+  void recordCost(env, 'openai', 'moderation', 0);
   return { flagged: !!first.flagged, reasons };
 }

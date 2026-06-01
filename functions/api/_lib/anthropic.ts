@@ -5,6 +5,7 @@ import type { Env } from './env';
 import type { GeneratedStory, Lang, StoryAnswer } from './types';
 import { requireEnv } from './env';
 import { notifyAdminFailure } from './alerts';
+import { recordCost } from './costs';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
@@ -87,6 +88,8 @@ export async function generateStory(env: Env, answers: StoryAnswer[], language: 
   if (!parsed.title || !Array.isArray(parsed.paragraphs) || parsed.paragraphs.length === 0) {
     throw new Error('Claude JSON missing required fields');
   }
+  // Flat rate estimate: $0.015 per story_gen call (refine with token usage later).
+  void recordCost(env, 'anthropic', 'story_gen', 0.015);
   return parsed;
 }
 
@@ -165,5 +168,7 @@ export async function translateStory(
   if (parsed.paragraphs.length !== source.paragraphs.length) {
     throw new Error(`translation: expected ${source.paragraphs.length} paragraphs, got ${parsed.paragraphs.length}`);
   }
+  // Flat rate estimate: $0.01 per translation call.
+  void recordCost(env, 'anthropic', 'translation', 0.01);
   return parsed;
 }

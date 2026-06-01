@@ -5,6 +5,7 @@ import { HomePage } from './routes/HomePage';
 import { CreatePage } from './routes/CreatePage';
 import { StoryPage } from './routes/StoryPage';
 import { EditPage } from './routes/EditPage';
+import { AdminPage } from './routes/AdminPage';
 import { NotFoundPage } from './routes/NotFoundPage';
 import { LangProvider } from './i18n';
 import { getCreatorId } from './creatorId';
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/s/:id" element={<StoryPage />} />
           <Route path="/s/:id/v/:version" element={<StoryPage />} />
           <Route path="/s/:id/edit" element={<EditPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>

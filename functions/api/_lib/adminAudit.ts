@@ -5,8 +5,8 @@
 import type { Env } from './env';
 
 export interface AdminAuditEntry {
-  action: 'delete_story' | 'delete_story_version';
-  story_id: string;
+  action: 'delete_story' | 'delete_story_version' | 'restore_story' | 'reset_costs' | 'list_flagged';
+  story_id?: string;
   version?: number;
   detail?: Record<string, unknown>;
   request_id?: string;
