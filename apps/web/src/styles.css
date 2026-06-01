@@ -770,7 +770,12 @@ ul.answer-list li b { color: var(--ink-soft); }
 .star:hover { color: var(--accent-deep); }
 
 .tile-stars { color: var(--sun); margin-top: 4px; letter-spacing: 2px; font-size: 18px; line-height: 1; }
-.tile-version { color: var(--ink-soft); font-size: 13px; margin-top: 8px; }
+
+/* Bigger flags on home tiles than on the story page */
+.recent-card .flag-row { gap: 10px; margin-top: 8px; }
+.recent-card .flag-row .flag { font-size: 36px; }
+.recent-card .flag-row .flag--current { font-size: 52px; }
+
 .tile-series {
   display: inline-block;
   align-self: flex-start;

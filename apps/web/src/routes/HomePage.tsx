@@ -114,7 +114,6 @@ export function HomePage() {
                     Part {g.primary.series_position} of {g.series_count}
                   </span>
                 )}
-                <span className="tile-version">v{g.primary.latest_version}</span>
               </div>
             </Link>
           ))}
