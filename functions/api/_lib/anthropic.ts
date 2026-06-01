@@ -43,7 +43,7 @@ const LANG_NAMES: Record<Lang, string> = {
   'pt-PT': 'European Portuguese (português de Portugal)',
 };
 
-export async function generateStory(env: Env, answers: StoryAnswer[], language: Lang): Promise<GeneratedStory> {
+export async function generateStory(env: Env, answers: StoryAnswer[], language: Lang, rhyme: boolean): Promise<GeneratedStory> {
   const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
   const client = new Anthropic({ apiKey });
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
@@ -51,6 +51,9 @@ export async function generateStory(env: Env, answers: StoryAnswer[], language: 
   const formattedAnswers = answers.map((a) => `${a.question}\n${a.answer}`).join('\n\n');
   const langName = LANG_NAMES[language];
   const languageInstruction = `Write the title and every paragraph's "text" in ${langName}. Keep every "image_prompt" in English so the image model understands it.`;
+  const rhymeInstruction = rhyme
+    ? 'Write every paragraph as a short rhyming verse in simple AABB couplets suitable for ages 3-6. Keep the rhymes natural — do not stretch the sentence just to force a rhyme.'
+    : 'Write in clear, warm prose suitable for ages 3-6.';
 
   let response: Awaited<ReturnType<typeof client.messages.create>>;
   try {
@@ -61,7 +64,7 @@ export async function generateStory(env: Env, answers: StoryAnswer[], language: 
       messages: [
         {
           role: 'user',
-          content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\nReturn only the JSON object.`,
+          content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\n${rhymeInstruction}\n\nReturn only the JSON object.`,
         },
       ],
     });

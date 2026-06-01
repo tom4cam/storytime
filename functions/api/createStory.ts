@@ -14,6 +14,7 @@ interface CreateStoryRequest {
   answers: StoryAnswer[];
   language: Lang;
   voice_id?: string;
+  rhyme?: boolean;
 }
 
 const VALID_LANGS = new Set(LANGS);
@@ -38,6 +39,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const voiceId = typeof body.voice_id === 'string' && body.voice_id ? body.voice_id : undefined;
+  const rhyme = typeof body.rhyme === 'boolean' ? body.rhyme : false;
   const creator_id = readCreatorId(request) ?? undefined;
   const id = crypto.randomUUID();
   try { await saveGeneratingStub(env, { id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, creator_id, listed: true }); }
@@ -54,7 +56,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // background body on this configuration, leaving stories stuck in
   // "generating" forever.
   try {
-    const story = await buildFromAnswers(env, id, trimmed, body.language, voiceId, creator_id);
+    const story = await buildFromAnswers(env, id, trimmed, body.language, voiceId, creator_id, rhyme);
     return json(story, 200);
   } catch (e) {
     const message = e instanceof ModerationError
@@ -63,7 +65,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     console.error('build failed', e);
     try {
       await saveFailedVersion(env, {
-        id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, error: message, creator_id, listed: true,
+        id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, error: message, creator_id, listed: true, rhyme,
       });
     } catch (saveErr) { console.error('Could not record failure state', saveErr); }
     if (e instanceof ModerationError) return json({ error: e.message }, 422);

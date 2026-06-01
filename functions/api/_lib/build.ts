@@ -63,6 +63,7 @@ export async function saveFailedVersion(env: Env, opts: {
   creator_id?: string;
   listed?: boolean;
   group_id?: string;
+  rhyme?: boolean;
 }): Promise<void> {
   const rec: StoryVersion = {
     id: opts.id,
@@ -79,6 +80,7 @@ export async function saveFailedVersion(env: Env, opts: {
     ...(opts.creator_id ? { creator_id: opts.creator_id } : {}),
     ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
     ...(opts.group_id ? { group_id: opts.group_id } : {}),
+    ...(opts.rhyme ? { rhyme: true } : {}),
   };
   await saveStoryVersion(env, rec);
 }
@@ -94,6 +96,7 @@ interface BuildOptions {
   listed?: boolean;
   summary?: string;
   group_id?: string;
+  rhyme?: boolean;
   paragraphs: { text: string; image_prompt?: string; image_url: string | null; regenerate_image?: boolean }[];
 }
 
@@ -151,6 +154,7 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
     ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
     ...(opts.summary && opts.summary.trim() ? { summary: opts.summary.trim() } : {}),
     ...(opts.group_id ? { group_id: opts.group_id } : {}),
+    ...(opts.rhyme ? { rhyme: true } : {}),
   };
   await saveStoryVersion(env, version);
   return version;
@@ -162,10 +166,11 @@ export async function buildFromAnswers(
   answers: StoryAnswer[],
   language: Lang,
   voiceId?: string,
-  creator_id?: string
+  creator_id?: string,
+  rhyme = false
 ): Promise<StoryVersion> {
   await moderateAnswers(env, answers);
-  const generated = await safelyGenerate(env, answers, language);
+  const generated = await safelyGenerate(env, answers, language, rhyme);
   return buildAndSaveVersion(env, {
     id,
     version: 1,
@@ -175,12 +180,13 @@ export async function buildFromAnswers(
     voiceId,
     creator_id,
     listed: true,
+    rhyme,
     paragraphs: generated.paragraphs.map((p) => ({ text: p.text, image_prompt: p.image_prompt, image_url: null })),
   });
 }
 
-async function safelyGenerate(env: Env, answers: StoryAnswer[], language: Lang): Promise<GeneratedStory> {
-  const generated = await generateStory(env, answers, language);
+async function safelyGenerate(env: Env, answers: StoryAnswer[], language: Lang, rhyme: boolean): Promise<GeneratedStory> {
+  const generated = await generateStory(env, answers, language, rhyme);
   const fullText = `${generated.title}\n\n${generated.paragraphs.map((p) => p.text).join('\n\n')}`;
   const result = await moderate(env, fullText);
   if (result.flagged) {

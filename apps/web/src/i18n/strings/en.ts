@@ -179,6 +179,11 @@ export const en = {
   'q.setting.simpler': 'Where does it happen?',
   'q.goal.simpler': 'What do they want?',
 
+  // Rhyme step
+  'rhyme.stepTitle': 'Should your story rhyme?',
+  'rhyme.yes': 'Yes, make it rhyme',
+  'rhyme.no': 'No, regular story',
+
   // Errors
   'error.generic': 'Something went wrong. Please try again.',
 } as const;

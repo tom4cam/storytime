@@ -54,7 +54,7 @@ const SAFE_CHIPS: { id: string; labelKey: StringKey }[] = [
   { id: 'animals',   labelKey: 'opener.chip.animals' },
 ];
 
-type StepKind = 'lang' | 'opener' | 'voice' | 'q';
+type StepKind = 'lang' | 'opener' | 'voice' | 'rhyme' | 'q';
 
 export function CreatePage() {
   const t = useT();
@@ -67,6 +67,7 @@ export function CreatePage() {
   const [openerText, setOpenerText] = useState('');
   const [modRedirect, setModRedirect] = useState(false);
   const [voiceKey, setVoiceKey] = useState<string>(() => defaultVoiceFor(uiLang).key);
+  const [rhyme, setRhyme] = useState(false);
   const [stepKind, setStepKind] = useState<StepKind>('lang');
   const [qIndex, setQIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -238,13 +239,34 @@ export function CreatePage() {
             <VoicePicker value={voiceKey} onChange={setVoiceKey} />
           </div>
           <div className="row right" style={{ marginTop: 12 }}>
-            <button type="button" className="btn sun" onClick={() => { setStepKind('q'); setQIndex(0); }}>
+            <button type="button" className="btn sun" onClick={() => { setStepKind('rhyme'); }}>
               {t('voice.next')}
             </button>
           </div>
           <p className="subtle" style={{ marginTop: 12 }}>
             {VOICES.length} {VOICES.length === 1 ? 'voice' : 'voices'} available.
           </p>
+        </div>
+      </Layout>
+    );
+  }
+
+  // -----------------------------------------------------------
+  // STEP: rhyme yes/no
+  // -----------------------------------------------------------
+  if (stepKind === 'rhyme') {
+    return (
+      <Layout showExit>
+        <div className="card">
+          <div className="question">{t('rhyme.stepTitle')}</div>
+          <div className="row" style={{ justifyContent: 'center', gap: 16, marginTop: 16 }}>
+            <button type="button" className="btn sun" onClick={() => { setRhyme(true); setStepKind('q'); setQIndex(0); }}>
+              {t('rhyme.yes')}
+            </button>
+            <button type="button" className="btn ghost" onClick={() => { setRhyme(false); setStepKind('q'); setQIndex(0); }}>
+              {t('rhyme.no')}
+            </button>
+          </div>
         </div>
       </Layout>
     );
@@ -293,7 +315,7 @@ export function CreatePage() {
       }
     }
     try {
-      const story = await createStory(payload, storyLang, voiceMeta.voiceId);
+      const story = await createStory(payload, storyLang, voiceMeta.voiceId, rhyme);
       navigate(`/s/${story.id}`);
     } catch (e) {
       setSubmitting(false);

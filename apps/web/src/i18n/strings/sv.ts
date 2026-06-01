@@ -169,6 +169,11 @@ export const sv: Record<StringKey, string> = {
   'q.setting.simpler': 'Var händer det?',
   'q.goal.simpler': 'Vad vill de?',
 
+  // Rhyme step
+  'rhyme.stepTitle': 'Ska sagan rimma?',
+  'rhyme.yes': 'Ja, gör den rimmad',
+  'rhyme.no': 'Nej, vanlig saga',
+
   // Errors
   'error.generic': 'Något gick fel. Försök igen.',
 
