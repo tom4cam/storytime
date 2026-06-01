@@ -1,17 +1,14 @@
 // GET /api/listStories
 
 import type { Env } from './_lib/env';
-import { listStoryIndexes } from './_lib/storage';
-import { json, serverError } from './_lib/util';
+import { listStoryIndexes, groupStoryIndexes } from './_lib/storage';
+import { LANGS, type Lang } from './_lib/types';
+import { json } from './_lib/util';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
-  try {
-    const items = await listStoryIndexes(env);
-    return json(items.slice(0, 30), 200, {
-      'Cache-Control': 'public, max-age=60, stale-while-revalidate=600',
-    });
-  } catch (e) {
-    console.error('listStories failed', e);
-    return serverError((e as Error).message);
-  }
+export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+  const url = new URL(request.url);
+  const raw = url.searchParams.get('lang');
+  const preferredLang: Lang | null = raw && (LANGS as readonly string[]).includes(raw) ? (raw as Lang) : null;
+  const indexes = await listStoryIndexes(env);
+  return json(groupStoryIndexes(indexes, preferredLang));
 };

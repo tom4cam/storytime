@@ -2,27 +2,32 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { listStories } from '../api';
-import { useT } from '../i18n';
+import { useT, useLang } from '../i18n';
 import { getCreatorId } from '../creatorId';
-import type { StorySummary } from '../types';
+import { LANG_FLAG } from '../lang';
+import type { Lang, StoryGroupSummary } from '../types';
 
 export function HomePage() {
   const t = useT();
-  const [recent, setRecent] = useState<StorySummary[]>([]);
+  const { lang: uiLang } = useLang();
+  const [recent, setRecent] = useState<StoryGroupSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [showMineOnly, setShowMineOnly] = useState(false);
   const myId = getCreatorId();
 
   useEffect(() => {
-    listStories()
-      .then((items) => setRecent(items))
+    listStories(uiLang as Lang)
+      .then(setRecent)
       .catch(() => { /* swallow */ })
       .finally(() => setLoaded(true));
-  }, []);
+  }, [uiLang]);
 
-  const ownedCount = useMemo(() => recent.filter((s) => s.creator_id === myId).length, [recent, myId]);
+  const ownedCount = useMemo(
+    () => recent.filter((g) => g.primary.creator_id === myId).length,
+    [recent, myId]
+  );
   const visible = useMemo(
-    () => (showMineOnly ? recent.filter((s) => s.creator_id === myId) : recent),
+    () => (showMineOnly ? recent.filter((g) => g.primary.creator_id === myId) : recent),
     [recent, myId, showMineOnly]
   );
 
@@ -62,16 +67,29 @@ export function HomePage() {
       )}
       {visible.length > 0 && (
         <div className="recent-list">
-          {visible.map((s) => (
-            <Link key={s.id} to={`/s/${s.id}`} className="recent-card">
+          {visible.map((g) => (
+            <Link key={g.primary.id} to={`/s/${g.primary.id}`} className="recent-card">
               <div className="thumb">
-                {s.cover_image_url
-                  ? <img src={s.cover_image_url} alt={s.title} />
+                {g.primary.cover_image_url
+                  ? <img src={g.primary.cover_image_url} alt={g.primary.title} />
                   : <span style={{ fontSize: 60 }}>{'\u{1F4D6}'}</span>}
               </div>
               <div className="meta">
-                <b>{s.title}</b>
-                <span>v{s.latest_version}</span>
+                <b>{g.primary.title}</b>
+                <span>v{g.primary.latest_version}</span>
+                {g.languages.length > 1 && (
+                  <span className="flag-row" aria-label={`Available languages: ${g.languages.join(', ')}`}>
+                    {g.languages.map((l) => (
+                      <span
+                        key={l}
+                        className={`flag${l === g.primary.language ? ' flag--current' : ''}`}
+                        aria-hidden="true"
+                      >
+                        {LANG_FLAG[l]}
+                      </span>
+                    ))}
+                  </span>
+                )}
               </div>
             </Link>
           ))}

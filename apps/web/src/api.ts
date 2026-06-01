@@ -1,5 +1,5 @@
 import { getAdminToken } from './adminToken';
-import type { Lang, StoryAnswer, StorySummary, StoryVersion } from './types';
+import type { Lang, StoryAnswer, StoryGroupSummary, StoryVersion } from './types';
 
 const FN_BASE = '/api';
 
@@ -54,9 +54,9 @@ export async function getStory(id: string, version?: number): Promise<StoryVersi
   return jsonOrThrow<StoryVersion>(res);
 }
 
-export async function listStories(): Promise<StorySummary[]> {
-  const res = await fetch(`${FN_BASE}/listStories`);
-  return jsonOrThrow<StorySummary[]>(res);
+export async function listStories(lang: Lang): Promise<StoryGroupSummary[]> {
+  const res = await fetch(`${FN_BASE}/listStories?lang=${encodeURIComponent(lang)}`);
+  return jsonOrThrow<StoryGroupSummary[]>(res);
 }
 
 export async function updateStory(

@@ -696,3 +696,14 @@ ul.answer-list li b { color: var(--ink-soft); }
   }
   .word:hover, .word.is-current, .word:focus-visible { background: none !important; outline: none !important; }
 }
+
+.flag-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 16px;
+  line-height: 1;
+}
+.flag-row .flag { opacity: 0.6; font-size: 16px; }
+.flag-row .flag--current { opacity: 1; font-size: 22px; }
