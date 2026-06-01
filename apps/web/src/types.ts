@@ -45,6 +45,21 @@ export interface StoryVersion {
   summary?: string;
   creator_id?: string;
   listed?: boolean;
+  group_id?: string;
+}
+
+export interface StoryIndex {
+  id: string;
+  title: string;
+  latest_version: number;
+  cover_image_url: string | null;
+  updated_at: string;
+  created_at: string;
+  status: StoryStatus;
+  language: Lang;
+  creator_id?: string;
+  listed?: boolean;
+  group_id?: string;
 }
 
 export interface StorySummary {
