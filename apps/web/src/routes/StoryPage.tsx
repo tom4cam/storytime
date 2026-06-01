@@ -31,6 +31,53 @@ export function StoryPage() {
   const audioRef = useRef<AudioBarRef | null>(null);
   const activeIndex = useAudioSync(audioRef, story?.narration_words);
   const lastScrolledParaRef = useRef<number>(-1);
+  // When the user clicks a word while audio is paused we play just that
+  // one word and auto-pause. This ref holds the disarm function so a
+  // follow-up click can cancel the pending pause before scheduling its own.
+  const pendingPauseRef = useRef<(() => void) | null>(null);
+
+  // Disarm any pending one-shot pause when the story changes or the
+  // page unmounts, otherwise a listener could fire against a stale audio
+  // element when the next story loads.
+  useEffect(() => {
+    return () => {
+      pendingPauseRef.current?.();
+      pendingPauseRef.current = null;
+    };
+  }, [story?.id, story?.version]);
+
+  const onWordClick = (w: WordTiming) => {
+    const el = audioRef.current;
+    if (!el) return;
+    // Whether playback should stop after this one word. "Auto-pause is
+    // already armed" counts as paused so rapid clicks behave consistently.
+    const wasPaused = el.paused || el.ended || pendingPauseRef.current !== null;
+    pendingPauseRef.current?.();
+    pendingPauseRef.current = null;
+    el.currentTime = w.start;
+    if (wasPaused) {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        el.removeEventListener('timeupdate', onTime);
+        window.clearTimeout(timer);
+        pendingPauseRef.current = null;
+      };
+      const onTime = () => {
+        if (el.currentTime >= w.end) { el.pause(); finish(); }
+      };
+      // Fallback timer in case timeupdate stalls. ElevenLabs word
+      // durations are typically 150-400ms; a small buffer avoids
+      // clipping the trailing phoneme.
+      const rate = el.playbackRate || 1;
+      const ms = Math.max(50, ((w.end - w.start) * 1000) / rate) + 40;
+      const timer = window.setTimeout(() => { el.pause(); finish(); }, ms);
+      el.addEventListener('timeupdate', onTime);
+      pendingPauseRef.current = finish;
+    }
+    void el.play();
+  };
   const myId = getCreatorId();
   const isOwner = !!story?.creator_id && story.creator_id !== 'system' && story.creator_id === myId;
   const admin = isAdmin();
@@ -171,11 +218,6 @@ export function StoryPage() {
 
   const versionLinks = Array.from({ length: story.version }, (_, i) => i + 1);
   const words = story.narration_words;
-  // Highlight only the currently-spoken word so the yellow always stays
-  // in sync with the audio (no peek-ahead that can bleed into the next
-  // paragraph at boundary frames).
-  const windowStart = activeIndex;
-  const windowEnd = activeIndex;
 
   return (
     <Layout showExit>
@@ -262,7 +304,7 @@ export function StoryPage() {
               : <div className="placeholder">No picture for this part.</div>}
           </div>
           <div className="p-text">
-            {renderParagraph(p.text, i, words, activeIndex, windowStart, windowEnd, audioRef)}
+            {renderParagraph(p.text, i, words, activeIndex, onWordClick)}
           </div>
         </div>
       ))}
@@ -461,9 +503,7 @@ function renderParagraph(
   paragraphIndex: number,
   words: WordTiming[] | undefined,
   activeIndex: number,
-  windowStart: number,
-  windowEnd: number,
-  audioRef: React.RefObject<HTMLAudioElement | null>
+  onWordClick: (w: WordTiming) => void,
 ) {
   if (!words || words.length === 0) {
     return text;
@@ -480,19 +520,14 @@ function renderParagraph(
 
   return wordsForPara.map((w, localIdx) => {
     const flatIdx = flatIndexes[localIdx];
-    const isCurrent = flatIdx >= windowStart && flatIdx <= windowEnd && activeIndex >= 0;
+    const isCurrent = flatIdx === activeIndex && activeIndex >= 0;
     return (
       <span key={`${w.paragraphIndex}-${w.wordIndex}`}>
         <button
           type="button"
           className={`word${isCurrent ? ' is-current' : ''}`}
           data-pw={`${w.paragraphIndex}-${w.wordIndex}`}
-          onClick={() => {
-            const el = audioRef.current;
-            if (!el) return;
-            el.currentTime = w.start;
-            void el.play();
-          }}
+          onClick={() => onWordClick(w)}
         >
           {w.word}
         </button>
