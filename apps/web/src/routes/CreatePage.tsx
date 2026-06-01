@@ -216,7 +216,9 @@ export function CreatePage() {
             ))}
           </div>
           <div style={{ marginTop: 12 }}>
+            <label htmlFor="opener-custom" className="sr-only">{t('opener.placeholder')}</label>
             <input
+              id="opener-custom"
               type="text"
               value={openerText}
               placeholder={t('opener.placeholder')}

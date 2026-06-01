@@ -12,6 +12,7 @@ import { useLang, useT } from '../i18n';
 import { LOCALES } from '../i18n/locales';
 import { LANG_FLAG } from '../lang';
 import type { Lang, StoryVersionWithSiblings, WordTiming } from '../types';
+import { imageAlt } from '../imageAlt';
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -220,7 +221,7 @@ export function StoryPage() {
         <div className={`paragraph ${i % 2 === 1 ? 'flip' : ''}`} key={i} data-para={i}>
           <div className="p-image">
             {p.image_url
-              ? <img src={p.image_url} alt={`Illustration for paragraph ${i + 1}`} />
+              ? <img src={p.image_url} alt={imageAlt(p)} />
               : <div className="placeholder">No picture for this part.</div>}
           </div>
           <div className="p-text">

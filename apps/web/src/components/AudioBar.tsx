@@ -94,6 +94,25 @@ export const AudioBar = forwardRef<AudioBarRef, Props>(function AudioBar({ src }
     el.currentTime = pct * duration;
   };
 
+  const onProgressKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const el = audioRef.current;
+    if (!el || !duration) return;
+    const STEP = 5; // seconds per arrow key press
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      el.currentTime = Math.min(duration, el.currentTime + STEP);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      el.currentTime = Math.max(0, el.currentTime - STEP);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      el.currentTime = 0;
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      el.currentTime = duration;
+    }
+  };
+
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const label = ended ? t('audio.replay') : isPlaying ? t('audio.pause') : t('audio.play');
 
@@ -111,11 +130,13 @@ export const AudioBar = forwardRef<AudioBarRef, Props>(function AudioBar({ src }
       <div
         className="audio-progress"
         role="slider"
-        aria-label={label}
+        aria-label={t('audio.progress')}
         aria-valuemin={0}
         aria-valuemax={Math.max(1, Math.round(duration))}
         aria-valuenow={Math.round(currentTime)}
+        tabIndex={0}
         onClick={onProgressClick}
+        onKeyDown={onProgressKey}
       >
         <div className="audio-progress-fill" style={{ width: `${pct}%` }} />
       </div>

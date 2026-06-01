@@ -44,10 +44,11 @@ function TokenGate({ onToken }: { onToken: (t: string) => void }) {
     <div className="page" style={{ maxWidth: 480 }}>
       <h1 style={{ fontSize: 28, margin: '0 0 16px' }}>Admin</h1>
       <form onSubmit={submit} className="card">
-        <label style={{ display: 'block', marginBottom: 8, fontWeight: 700 }}>
+        <label htmlFor="admin-token" style={{ display: 'block', marginBottom: 8, fontWeight: 700 }}>
           Admin token
         </label>
         <input
+          id="admin-token"
           type="password"
           value={value}
           onChange={(e) => setValue(e.target.value)}

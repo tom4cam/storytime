@@ -135,6 +135,7 @@ export const en = {
   'audio.play': 'Play',
   'audio.pause': 'Pause',
   'audio.replay': 'Play again',
+  'audio.progress': 'Audio progress',
 
   // Settings cog
   'settings.title': 'Settings',

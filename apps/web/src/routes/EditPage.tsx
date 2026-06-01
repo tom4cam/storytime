@@ -5,6 +5,7 @@ import { getStory, updateStory } from '../api';
 import { useT } from '../i18n';
 import { getCreatorId } from '../creatorId';
 import type { Paragraph, StoryVersion } from '../types';
+import { imageAlt } from '../imageAlt';
 
 interface DraftParagraph extends Paragraph {
   regenerate_image?: boolean;
@@ -129,7 +130,7 @@ export function EditPage() {
           </div>
           {p.image_url && !p.regenerate_image && (
             <div style={{ marginTop: 12 }}>
-              <img src={p.image_url} alt={t('edit.paragraphLabel', { n: String(i + 1) })} style={{ maxWidth: 240, borderRadius: 16, border: '3px solid var(--ink)' }} />
+              <img src={p.image_url} alt={imageAlt(p)} style={{ maxWidth: 240, borderRadius: 16, border: '3px solid var(--ink)' }} />
             </div>
           )}
         </div>

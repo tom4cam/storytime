@@ -104,6 +104,7 @@ export const bg = {
   "audio.play": "Пусни",
   "audio.pause": "Пауза",
   "audio.replay": "Пусни отново",
+  "audio.progress": "Напредък на звука",
   "settings.title": "Настройки",
   "settings.language": "Език",
   "settings.languageEn": "English",

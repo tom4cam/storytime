@@ -104,6 +104,7 @@ export const fr = {
   "audio.play": "Écouter",
   "audio.pause": "Pause",
   "audio.replay": "Réécouter",
+  "audio.progress": "Progression audio",
   "settings.title": "Paramètres",
   "settings.language": "Langue",
   "settings.languageEn": "English",

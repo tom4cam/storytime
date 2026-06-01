@@ -125,6 +125,7 @@ export const sv: Record<StringKey, string> = {
   'audio.play': 'Spela',
   'audio.pause': 'Pausa',
   'audio.replay': 'Spela igen',
+  'audio.progress': 'Ljudframsteg',
 
   // Settings cog
   'settings.title': 'Inställningar',

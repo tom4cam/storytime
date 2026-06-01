@@ -22,8 +22,9 @@ export function ConfirmTyped({ title, body, word, onConfirm, onCancel }: Props) 
     <div className="card delete-confirm no-print" style={{ marginTop: 16 }}>
       <div className="question">{title}</div>
       <p>{body}</p>
-      <p className="subtle">{t('admin.confirmPrompt', { word: expected })}</p>
+      <label htmlFor="confirm-typed" className="subtle">{t('admin.confirmPrompt', { word: expected })}</label>
       <input
+        id="confirm-typed"
         type="text"
         autoFocus
         placeholder={t('admin.confirmPlaceholder')}
