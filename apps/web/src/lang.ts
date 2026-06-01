@@ -6,6 +6,7 @@ export const LANG_FLAG: Record<Lang, string> = {
   bg: '🇧🇬',
   es: '🇪🇸',
   fr: '🇫🇷',
+  it: '🇮🇹',
   mk: '🇲🇰',
   'pt-BR': '🇧🇷',
   'pt-PT': '🇵🇹',

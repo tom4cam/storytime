@@ -1,0 +1,17 @@
+{
+  "name": "storytime",
+  "short_name": "storytime",
+  "description": "A kid-friendly app for making narrated, illustrated stories.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fef6e4",
+  "theme_color": "#fef6e4",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

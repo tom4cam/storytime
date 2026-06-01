@@ -38,6 +38,7 @@ const LANG_NAMES: Record<Lang, string> = {
   bg: 'Bulgarian',
   es: 'simple, warm Spanish (Latin American)',
   fr: 'simple, warm French (European)',
+  it: 'Italian (italiano)',
   mk: 'Macedonian (македонски)',
   'pt-BR': 'Brazilian Portuguese (português do Brasil)',
   'pt-PT': 'European Portuguese (português de Portugal)',

@@ -136,6 +136,15 @@ export function CreatePage() {
               </button>
             ))}
           </div>
+          <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
+            <a
+              href="mailto:tom.caswell@saylor.org?subject=Storytime%20language%20request&body=Please%20add%20support%20for%3A%20"
+              className="btn ghost"
+              style={{ fontSize: 16 }}
+            >
+              {t('create.requestLang')}
+            </a>
+          </div>
           <p className="subtle" style={{ marginTop: 16 }}>
             {t('home.heroBody')}
           </p>

@@ -3,7 +3,7 @@
 
 export const LANGS = [
   'en', 'sv', 'bg', 'es', 'fr',
-  'mk',
+  'it', 'mk',
   'pt-BR', 'pt-PT',
 ] as const;
 export type Lang = typeof LANGS[number];
