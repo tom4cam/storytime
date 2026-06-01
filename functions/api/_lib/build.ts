@@ -65,6 +65,8 @@ export async function saveFailedVersion(env: Env, opts: {
   listed?: boolean;
   group_id?: string;
   rhyme?: boolean;
+  series_id?: string;
+  series_position?: number;
 }): Promise<void> {
   const rec: StoryVersion = {
     id: opts.id,
@@ -82,6 +84,8 @@ export async function saveFailedVersion(env: Env, opts: {
     ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
     ...(opts.group_id ? { group_id: opts.group_id } : {}),
     ...(opts.rhyme ? { rhyme: true } : {}),
+    ...(opts.series_id ? { series_id: opts.series_id } : {}),
+    ...(opts.series_position !== undefined ? { series_position: opts.series_position } : {}),
   };
   await saveStoryVersion(env, rec);
 }
@@ -98,6 +102,8 @@ interface BuildOptions {
   summary?: string;
   group_id?: string;
   rhyme?: boolean;
+  series_id?: string;
+  series_position?: number;
   paragraphs: { text: string; image_prompt?: string; image_url: string | null; regenerate_image?: boolean }[];
 }
 
@@ -156,6 +162,8 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
     ...(opts.summary && opts.summary.trim() ? { summary: opts.summary.trim() } : {}),
     ...(opts.group_id ? { group_id: opts.group_id } : {}),
     ...(opts.rhyme ? { rhyme: true } : {}),
+    ...(opts.series_id ? { series_id: opts.series_id } : {}),
+    ...(opts.series_position !== undefined ? { series_position: opts.series_position } : {}),
   };
   await saveStoryVersion(env, version);
   return version;
@@ -168,7 +176,9 @@ export async function buildFromAnswers(
   language: Lang,
   voiceId?: string,
   creator_id?: string,
-  rhyme = false
+  rhyme = false,
+  series_id?: string,
+  series_position?: number,
 ): Promise<StoryVersion> {
   await moderateAnswers(env, answers);
   const generated = await safelyGenerate(env, answers, language, rhyme);
@@ -182,6 +192,8 @@ export async function buildFromAnswers(
     creator_id,
     listed: true,
     rhyme,
+    series_id,
+    series_position,
     paragraphs: generated.paragraphs.map((p) => ({ text: p.text, image_prompt: p.image_prompt, image_url: null })),
   });
 }

@@ -13,14 +13,16 @@ export function HomePage() {
   const [recent, setRecent] = useState<StoryGroupSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [showMineOnly, setShowMineOnly] = useState(false);
+  const [sort, setSort] = useState<'recent' | 'stars'>('recent');
   const myId = getCreatorId();
 
   useEffect(() => {
-    listStories(uiLang as Lang)
+    setLoaded(false);
+    listStories(uiLang as Lang, sort)
       .then(setRecent)
       .catch(() => { /* swallow */ })
       .finally(() => setLoaded(true));
-  }, [uiLang]);
+  }, [uiLang, sort]);
 
   const ownedCount = useMemo(
     () => recent.filter((g) => g.primary.creator_id === myId).length,
@@ -39,7 +41,17 @@ export function HomePage() {
         <Link to="/create" className="btn sun">{t('home.heroCta')}</Link>
       </div>
 
-      <h2 style={{ marginTop: 8 }}>{t('home.recentHeading')}</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>{t('home.recentHeading')}</h2>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as 'recent' | 'stars')}
+          aria-label="Sort stories"
+        >
+          <option value="recent">Most recent</option>
+          <option value="stars">Top rated</option>
+        </select>
+      </div>
       {ownedCount > 0 && (
         <div className="filter-pills">
           <button
@@ -77,6 +89,11 @@ export function HomePage() {
               <div className="meta">
                 <b>{g.primary.title}</b>
                 <span>v{g.primary.latest_version}</span>
+                {g.primary.stars && (
+                  <span className="tile-stars" aria-label={`Rated ${g.primary.stars} of 5`}>
+                    {'★'.repeat(g.primary.stars)}{'☆'.repeat(5 - g.primary.stars)}
+                  </span>
+                )}
                 {g.languages.length > 1 && (
                   <span className="flag-row" aria-label={`Available languages: ${g.languages.join(', ')}`}>
                     {g.languages.map((l) => (

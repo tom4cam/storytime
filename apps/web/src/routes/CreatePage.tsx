@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { MicInput } from '../components/MicInput';
 import { VoicePicker } from '../components/VoicePicker';
 import { HelpYesNo } from '../components/HelpYesNo';
-import { ApiError, createStory, moderateText } from '../api';
+import { ApiError, createStory, getStory, moderateText } from '../api';
 import { cancelSpeech, speakBest, stopAskVoice } from '../speech';
 import { useLang, useT } from '../i18n';
 import type { Lang } from '../types';
@@ -61,6 +61,17 @@ export function CreatePage() {
   const { lang: uiLang } = useLang();
   const [prefs] = usePrefs();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Series support: ?series=<series_id>&from=<source_story_id>
+  const seriesParam = searchParams.get('series') ?? undefined;
+  const fromParam = searchParams.get('from') ?? undefined;
+  const [sourceTitle, setSourceTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!fromParam) return;
+    getStory(fromParam).then((s) => setSourceTitle(s.title)).catch(() => { /* swallow */ });
+  }, [fromParam]);
 
   const [storyLang, setStoryLang] = useState<Lang | null>(null);
   const [storyType, setStoryType] = useState<string | null>(null);
@@ -116,12 +127,19 @@ export function CreatePage() {
 
   useEffect(() => () => { cancelSpeech(); stopAskVoice(); }, []);
 
+  const seriesBanner = seriesParam && (
+    <div className="series-badge" style={{ display: 'block', marginBottom: 16 }}>
+      {sourceTitle ? `This will be a sequel to "${sourceTitle}"` : 'This will be added to a series'}
+    </div>
+  );
+
   // -----------------------------------------------------------
   // STEP: pick story language
   // -----------------------------------------------------------
   if (!storyLang) {
     return (
       <Layout>
+        {seriesBanner}
         <div className="card">
           <div className="question">{t('create.langStepTitle')}</div>
           <div className="lang-grid" style={{ marginTop: 16 }}>
@@ -326,7 +344,7 @@ export function CreatePage() {
       }
     }
     try {
-      const story = await createStory(payload, storyLang, voiceMeta.voiceId, rhyme);
+      const story = await createStory(payload, storyLang, voiceMeta.voiceId, rhyme, seriesParam);
       navigate(`/s/${story.id}`);
     } catch (e) {
       setSubmitting(false);

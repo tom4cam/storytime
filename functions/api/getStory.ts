@@ -14,13 +14,28 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const story = await getStoryVersion(env, id, version);
   if (!story) return notFound('Story not found.');
 
+  const needsIndex = !!(story.group_id || story.series_id);
+  const indexes = needsIndex ? await listStoryIndexes(env) : [];
+
   let siblings: Array<{ id: string; language: Lang }> = [];
   if (story.group_id) {
-    const indexes = await listStoryIndexes(env);
     siblings = indexes
       .filter((i) => i.group_id === story.group_id && i.id !== story.id)
       .map((i) => ({ id: i.id, language: i.language }));
   }
 
-  return json({ ...story, siblings });
+  let series: {
+    series_id: string;
+    position: number;
+    members: Array<{ id: string; position: number; title: string }>;
+  } | null = null;
+  if (story.series_id && story.series_position !== undefined) {
+    const members = indexes
+      .filter((i) => i.series_id === story.series_id)
+      .map((i) => ({ id: i.id, position: i.series_position ?? 0, title: i.title }))
+      .sort((a, b) => a.position - b.position);
+    series = { series_id: story.series_id, position: story.series_position, members };
+  }
+
+  return json({ ...story, siblings, series });
 };

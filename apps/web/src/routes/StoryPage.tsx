@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { AudioBar, type AudioBarRef } from '../components/AudioBar';
 import { ShareButton } from '../components/ShareButton';
-import { deleteStory, deleteStoryVersion, getStory, translateStory as apiTranslate, updateStoryListing } from '../api';
+import { deleteStory, deleteStoryVersion, getStory, setStars as apiSetStars, translateStory as apiTranslate, updateStoryListing } from '../api';
 import { getCreatorId } from '../creatorId';
 import { isAdmin } from '../adminToken';
 import { ConfirmTyped } from '../components/ConfirmTyped';
@@ -41,6 +41,18 @@ export function StoryPage() {
   const [translatePickerOpen, setTranslatePickerOpen] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [translateError, setTranslateError] = useState<string | null>(null);
+
+  const onSetStars = async (stars: number | null) => {
+    if (!story) return;
+    const prev = story.stars;
+    setStory((s) => s ? { ...s, stars: stars ?? undefined } : s);
+    try {
+      const result = await apiSetStars(story.id, stars);
+      setStory((s) => s ? { ...s, stars: result.stars ?? undefined } : s);
+    } catch {
+      setStory((s) => s ? { ...s, stars: prev } : s);
+    }
+  };
 
   const onPickTranslation = async (target: 'en' | 'sv' | 'bg' | 'es' | 'fr') => {
     if (!story) return;
@@ -183,6 +195,29 @@ export function StoryPage() {
           ))}
         </div>
       )}
+      {story.series && (
+        <div>
+          <span className="series-badge" aria-label={`Part ${story.series.position} of ${story.series.members.length}`}>
+            Part {story.series.position} of {story.series.members.length}
+          </span>
+        </div>
+      )}
+      {isOwner && (
+        <div className="star-row" aria-label="Story rating">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`star${(story.stars ?? 0) >= n ? ' star--on' : ''}`}
+              aria-label={`${n} star${n === 1 ? '' : 's'}`}
+              aria-pressed={(story.stars ?? 0) >= n}
+              onClick={() => onSetStars(story.stars === n ? null : n)}
+            >
+              {(story.stars ?? 0) >= n ? '★' : '☆'}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="story-meta">
         {t('story.versionPrefix')} {story.version} ({t('story.savedPrefix')} {formatDate(story.created_at, lang)})
       </div>
@@ -230,6 +265,22 @@ export function StoryPage() {
         </div>
       ))}
 
+      {story.series && (() => {
+        const { members, position } = story.series;
+        const prev = members.find((m) => m.position === position - 1);
+        const next = members.find((m) => m.position === position + 1);
+        return (prev || next) ? (
+          <div className="series-nav no-print">
+            {prev
+              ? <Link to={`/s/${prev.id}`} className="btn">← Part {prev.position}: {prev.title}</Link>
+              : <span />}
+            {next
+              ? <Link to={`/s/${next.id}`} className="btn">Part {next.position}: {next.title} →</Link>
+              : <span />}
+          </div>
+        ) : null;
+      })()}
+
       <div className="row no-print" style={{ justifyContent: 'center', marginTop: 24 }}>
         <Link to={`/s/${story.id}/edit`} className="btn secondary">{t('story.editLink')}</Link>
         <button type="button" className="btn ghost" onClick={() => window.print()}>
@@ -262,6 +313,14 @@ export function StoryPage() {
                 </button>
               ))}
           </div>
+        </div>
+      )}
+
+      {isOwner && (
+        <div className="row no-print" style={{ justifyContent: 'center', marginTop: 16 }}>
+          {story.series
+            ? <Link to={`/create?series=${story.series.series_id}&from=${story.id}`} className="btn ghost">Make a sequel</Link>
+            : <Link to={`/create?series=${story.id}&from=${story.id}`} className="btn ghost">Make a sequel</Link>}
         </div>
       )}
 

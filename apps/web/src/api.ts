@@ -37,12 +37,13 @@ export async function createStory(
   answers: StoryAnswer[],
   language: Lang,
   voiceId?: string,
-  rhyme = false
+  rhyme = false,
+  series_id?: string,
 ): Promise<StoryVersion> {
   const res = await fetch(`${FN_BASE}/createStory`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answers, language, voice_id: voiceId, rhyme }),
+    body: JSON.stringify({ answers, language, voice_id: voiceId, rhyme, ...(series_id ? { series_id } : {}) }),
   });
   return jsonOrThrow<StoryVersion>(res);
 }
@@ -55,9 +56,20 @@ export async function getStory(id: string, version?: number): Promise<StoryVersi
   return jsonOrThrow<StoryVersionWithSiblings>(res);
 }
 
-export async function listStories(lang: Lang): Promise<StoryGroupSummary[]> {
-  const res = await fetch(`${FN_BASE}/listStories?lang=${encodeURIComponent(lang)}`);
+export async function listStories(lang: Lang, sort?: 'stars' | 'recent'): Promise<StoryGroupSummary[]> {
+  const params = new URLSearchParams({ lang });
+  if (sort && sort !== 'recent') params.set('sort', sort);
+  const res = await fetch(`${FN_BASE}/listStories?${params}`);
   return jsonOrThrow<StoryGroupSummary[]>(res);
+}
+
+export async function setStars(id: string, stars: number | null): Promise<{ ok: boolean; stars: number | null }> {
+  const res = await fetch(`${FN_BASE}/setStars`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, stars }),
+  });
+  return jsonOrThrow<{ ok: boolean; stars: number | null }>(res);
 }
 
 export async function updateStory(

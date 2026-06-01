@@ -47,6 +47,9 @@ export interface StoryVersion {
   listed?: boolean;
   group_id?: string;
   rhyme?: boolean;
+  stars?: number;
+  series_id?: string;
+  series_position?: number;
 }
 
 export interface StoryIndex {
@@ -61,6 +64,9 @@ export interface StoryIndex {
   creator_id?: string;
   listed?: boolean;
   group_id?: string;
+  stars?: number;
+  series_id?: string;
+  series_position?: number;
 }
 
 export interface GeneratedStory {

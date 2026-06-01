@@ -754,3 +754,33 @@ ul.answer-list li b { color: var(--ink-soft); }
 }
 .lang-btn:hover { background: var(--accent-soft); }
 .lang-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,24,88,0.12); }
+
+/* Star ratings */
+.star-row { display: inline-flex; gap: 6px; margin-top: 8px; }
+.star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 28px;
+  color: var(--ink-soft);
+  padding: 4px 6px;
+  line-height: 1;
+}
+.star--on { color: var(--sun); }
+.star:hover { color: var(--accent-deep); }
+
+.tile-stars { color: var(--sun); margin-top: 4px; letter-spacing: 2px; }
+
+/* Series */
+.series-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--leaf);
+  font-weight: 800;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.series-nav { display: flex; gap: 16px; justify-content: space-between; margin: 32px 0; }
+.series-nav .btn { font-size: 16px; padding: 12px 18px; }

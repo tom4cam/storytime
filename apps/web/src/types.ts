@@ -47,6 +47,9 @@ export interface StoryVersion {
   listed?: boolean;
   group_id?: string;
   rhyme?: boolean;
+  stars?: number;
+  series_id?: string;
+  series_position?: number;
 }
 
 export interface StoryIndex {
@@ -61,6 +64,9 @@ export interface StoryIndex {
   creator_id?: string;
   listed?: boolean;
   group_id?: string;
+  stars?: number;
+  series_id?: string;
+  series_position?: number;
 }
 
 export interface StorySummary {
@@ -78,6 +84,13 @@ export interface StoryGroupSummary {
   languages: Lang[];
 }
 
+export interface SeriesInfo {
+  series_id: string;
+  position: number;
+  members: Array<{ id: string; position: number; title: string }>;
+}
+
 export interface StoryVersionWithSiblings extends StoryVersion {
   siblings: Array<{ id: string; language: Lang }>;
+  series: SeriesInfo | null;
 }

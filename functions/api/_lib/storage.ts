@@ -37,6 +37,9 @@ export async function saveStoryVersion(env: Env, version: StoryVersion): Promise
     ...(version.creator_id ? { creator_id: version.creator_id } : {}),
     ...(version.listed !== undefined ? { listed: version.listed } : {}),
     ...(version.group_id ? { group_id: version.group_id } : {}),
+    ...(version.stars !== undefined ? { stars: version.stars } : {}),
+    ...(version.series_id ? { series_id: version.series_id } : {}),
+    ...(version.series_position !== undefined ? { series_position: version.series_position } : {}),
   };
   await env.STORIES.put(`${version.id}/index.json`, JSON.stringify(idx), {
     httpMetadata: { contentType: 'application/json' },
@@ -214,6 +217,9 @@ export async function deleteOneStoryVersion(env: Env, id: string, version: numbe
         ...(newLatest.creator_id ? { creator_id: newLatest.creator_id } : {}),
         ...(newLatest.listed !== undefined ? { listed: newLatest.listed } : {}),
         ...(newLatest.group_id ? { group_id: newLatest.group_id } : {}),
+        ...(newLatest.stars !== undefined ? { stars: newLatest.stars } : {}),
+        ...(newLatest.series_id ? { series_id: newLatest.series_id } : {}),
+        ...(newLatest.series_position !== undefined ? { series_position: newLatest.series_position } : {}),
       };
       await env.STORIES.put(`${id}/index.json`, JSON.stringify(next), {
         httpMetadata: { contentType: 'application/json' },
