@@ -62,6 +62,7 @@ export async function saveFailedVersion(env: Env, opts: {
   voiceId?: string;
   creator_id?: string;
   listed?: boolean;
+  group_id?: string;
 }): Promise<void> {
   const rec: StoryVersion = {
     id: opts.id,
@@ -77,6 +78,7 @@ export async function saveFailedVersion(env: Env, opts: {
     ...(opts.voiceId ? { voice_id: opts.voiceId } : {}),
     ...(opts.creator_id ? { creator_id: opts.creator_id } : {}),
     ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
+    ...(opts.group_id ? { group_id: opts.group_id } : {}),
   };
   await saveStoryVersion(env, rec);
 }
@@ -91,6 +93,7 @@ interface BuildOptions {
   creator_id?: string;
   listed?: boolean;
   summary?: string;
+  group_id?: string;
   paragraphs: { text: string; image_prompt?: string; image_url: string | null; regenerate_image?: boolean }[];
 }
 
@@ -147,6 +150,7 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
     ...(opts.creator_id ? { creator_id: opts.creator_id } : {}),
     ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
     ...(opts.summary && opts.summary.trim() ? { summary: opts.summary.trim() } : {}),
+    ...(opts.group_id ? { group_id: opts.group_id } : {}),
   };
   await saveStoryVersion(env, version);
   return version;

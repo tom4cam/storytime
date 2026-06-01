@@ -51,6 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       voiceId: source.voice_id,
       creator_id,
       listed: true,
+      group_id: source.group_id ?? source.id,
       paragraphs: source.paragraphs.map((p, i) => ({
         text: translated.paragraphs[i],
         image_prompt: p.image_prompt,
