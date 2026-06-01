@@ -82,6 +82,7 @@ export interface StoryGroupSummary {
   group_id: string | null;
   primary: StoryIndex;
   languages: Lang[];
+  members: Array<{ id: string; language: Lang }>;
   series_count?: number;
 }
 

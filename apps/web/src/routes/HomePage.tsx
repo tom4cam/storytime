@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { listStories } from '../api';
 import { useT, useLang } from '../i18n';
@@ -9,6 +9,7 @@ import type { Lang, StoryGroupSummary } from '../types';
 
 export function HomePage() {
   const t = useT();
+  const navigate = useNavigate();
   const { lang: uiLang } = useLang();
   const [recent, setRecent] = useState<StoryGroupSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -79,44 +80,59 @@ export function HomePage() {
       )}
       {visible.length > 0 && (
         <div className="recent-list">
-          {visible.map((g) => (
-            <Link key={g.primary.id} to={`/s/${g.primary.id}`} className="recent-card">
-              <div className="thumb">
-                {g.primary.cover_image_url
-                  ? <img src={g.primary.cover_image_url} alt={g.primary.title} />
-                  : <span style={{ fontSize: 60 }}>{'\u{1F4D6}'}</span>}
-              </div>
-              <div className="meta">
-                <b>{g.primary.title}</b>
-                <span
-                  className="tile-stars"
-                  aria-label={g.primary.stars ? `Rated ${g.primary.stars} of 5` : 'Not rated'}
-                >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <span key={n}>{(g.primary.stars ?? 0) >= n ? '★' : '☆'}</span>
-                  ))}
-                </span>
-                {g.languages.length > 1 && (
-                  <span className="flag-row" aria-label={`Available languages: ${g.languages.join(', ')}`}>
-                    {g.languages.map((l) => (
-                      <span
-                        key={l}
-                        className={`flag${l === g.primary.language ? ' flag--current' : ''}`}
-                        aria-hidden="true"
-                      >
-                        {LANG_FLAG[l]}
-                      </span>
+          {visible.map((g) => {
+            const goPrimary = () => navigate(`/s/${g.primary.id}`);
+            return (
+              <div
+                key={g.primary.id}
+                className="recent-card"
+                role="link"
+                tabIndex={0}
+                onClick={goPrimary}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goPrimary(); }
+                }}
+                aria-label={g.primary.title}
+              >
+                <div className="thumb">
+                  {g.primary.cover_image_url
+                    ? <img src={g.primary.cover_image_url} alt={g.primary.title} />
+                    : <span style={{ fontSize: 60 }}>{'\u{1F4D6}'}</span>}
+                </div>
+                <div className="meta">
+                  <b>{g.primary.title}</b>
+                  <span
+                    className="tile-stars"
+                    aria-label={g.primary.stars ? `Rated ${g.primary.stars} of 5` : 'Not rated'}
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <span key={n}>{(g.primary.stars ?? 0) >= n ? '★' : '☆'}</span>
                     ))}
                   </span>
-                )}
-                {g.series_count && g.series_count > 1 && g.primary.series_position && (
-                  <span className="tile-series" aria-label={`Part ${g.primary.series_position} of ${g.series_count}`}>
-                    Part {g.primary.series_position} of {g.series_count}
-                  </span>
-                )}
+                  {g.members.length > 1 && (
+                    <span className="flag-row" aria-label="Open in another language">
+                      {g.members.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className={`flag${m.id === g.primary.id ? ' flag--current' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/s/${m.id}`); }}
+                          aria-label={`Open in ${m.language}`}
+                        >
+                          {LANG_FLAG[m.language]}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                  {g.series_count && g.series_count > 1 && g.primary.series_position && (
+                    <span className="tile-series" aria-label={`Part ${g.primary.series_position} of ${g.series_count}`}>
+                      Part {g.primary.series_position} of {g.series_count}
+                    </span>
+                  )}
+                </div>
               </div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </Layout>

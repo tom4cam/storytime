@@ -171,9 +171,11 @@ export function StoryPage() {
 
   const versionLinks = Array.from({ length: story.version }, (_, i) => i + 1);
   const words = story.narration_words;
-  // Highlight just the active word plus the next one (2 words max).
+  // Highlight only the currently-spoken word so the yellow always stays
+  // in sync with the audio (no peek-ahead that can bleed into the next
+  // paragraph at boundary frames).
   const windowStart = activeIndex;
-  const windowEnd = activeIndex + 1;
+  const windowEnd = activeIndex;
 
   return (
     <Layout showExit>

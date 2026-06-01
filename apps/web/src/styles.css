@@ -729,11 +729,19 @@ ul.answer-list li b { color: var(--ink-soft); }
 }
 .flag-row .flag { opacity: 0.6; font-size: 28px; }
 .flag-row .flag--current { opacity: 1; font-size: 40px; }
-.flag-row a.flag {
+.flag-row a.flag,
+.flag-row button.flag {
   text-decoration: none;
   cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  line-height: 1;
+  color: inherit;
 }
-.flag-row a.flag:hover { opacity: 1; }
+.flag-row a.flag:hover,
+.flag-row button.flag:hover { opacity: 1; }
 
 /* Header lang toggle (next to the cog) */
 .header-row { display: inline-flex; align-items: center; gap: 8px; }

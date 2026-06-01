@@ -144,12 +144,22 @@ export function groupStoryIndexes(
   const groups: StoryGroupSummary[] = [];
   for (const { groupId, members } of buckets.values()) {
     const primary = pickPrimary(members, preferredLang);
-    const languages = [...new Set(members.map((m) => m.language))];
+    // One entry per language; if multiple members share a language (shouldn't
+    // happen in practice), keep the first.
+    const seen = new Set<string>();
+    const memberRefs: Array<{ id: string; language: Lang }> = [];
+    for (const m of members) {
+      if (seen.has(m.language)) continue;
+      seen.add(m.language);
+      memberRefs.push({ id: m.id, language: m.language });
+    }
+    const languages = memberRefs.map((m) => m.language);
     const series_count = primary.series_id ? seriesPositions.get(primary.series_id)?.size : undefined;
     groups.push({
       group_id: groupId,
       primary,
       languages,
+      members: memberRefs,
       ...(series_count && series_count > 1 ? { series_count } : {}),
     });
   }
