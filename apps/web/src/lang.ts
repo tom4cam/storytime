@@ -1,7 +1,7 @@
 import type { Lang } from './types';
 
 export const LANG_FLAG: Record<Lang, string> = {
-  en: '🇬🇧',
+  en: '🇺🇸',
   sv: '🇸🇪',
   bg: '🇧🇬',
   es: '🇪🇸',

@@ -755,6 +755,41 @@ ul.answer-list li b { color: var(--ink-soft); }
 .lang-btn:hover { background: var(--accent-soft); }
 .lang-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,24,88,0.12); }
 
+.lang-picker { position: relative; }
+.lang-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 10;
+  background: var(--paper);
+  border: 4px solid var(--ink);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(0, 24, 88, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+}
+.lang-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: left;
+}
+.lang-popover-item:hover { background: var(--accent-soft); }
+.lang-popover-item.on { background: var(--accent); border-color: var(--ink); }
+.lang-popover-flag { font-size: 24px; line-height: 1; }
+
 /* Star ratings */
 .star-row { display: inline-flex; gap: 6px; margin-top: 8px; }
 .star {

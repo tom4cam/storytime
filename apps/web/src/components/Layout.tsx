@@ -1,9 +1,13 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useT, useLang } from '../i18n';
+import type { Lang as UiLang } from '../i18n';
 import { SettingsCog } from './SettingsCog';
 import { BookLogo } from './BookLogo';
 import { LANG_FLAG } from '../lang';
+
+const UI_LANGS = ['en', 'sv', 'bg', 'es', 'fr'] as const satisfies readonly UiLang[];
 
 interface Props {
   children: ReactNode;
@@ -14,13 +18,27 @@ export function Layout({ children, showExit = false }: Props) {
   const t = useT();
   const { lang: uiLang, setLang } = useLang();
   const navigate = useNavigate();
+  const [langOpen, setLangOpen] = useState(false);
+  const langPickerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!langOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (langPickerRef.current && !langPickerRef.current.contains(e.target as Node)) setLangOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setLangOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [langOpen]);
 
   const goBack = () => {
     if (window.history.length > 1) navigate(-1);
     else navigate('/');
   };
-
-  const toggleLang = () => setLang(uiLang === 'en' ? 'sv' : 'en');
 
   return (
     <div className="page">
@@ -49,15 +67,34 @@ export function Layout({ children, showExit = false }: Props) {
             </button>
           )}
           <div className="header-row">
-            <button
-              type="button"
-              className="lang-btn"
-              onClick={toggleLang}
-              aria-label={t('settings.language')}
-              title={t('settings.language')}
-            >
-              {LANG_FLAG[uiLang]}
-            </button>
+            <div className="lang-picker" ref={langPickerRef}>
+              <button
+                type="button"
+                className="lang-btn"
+                onClick={() => setLangOpen((v) => !v)}
+                aria-label={t('settings.language')}
+                aria-expanded={langOpen}
+                title={t('settings.language')}
+              >
+                {LANG_FLAG[uiLang]}
+              </button>
+              {langOpen && (
+                <div className="lang-popover" role="dialog" aria-label={t('settings.language')}>
+                  {UI_LANGS.map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      className={`lang-popover-item${uiLang === code ? ' on' : ''}`}
+                      onClick={() => { setLang(code); setLangOpen(false); }}
+                      aria-pressed={uiLang === code}
+                    >
+                      <span className="lang-popover-flag" aria-hidden="true">{LANG_FLAG[code]}</span>
+                      <span>{t(`settings.language${code[0].toUpperCase()}${code[1]}` as 'settings.languageEn')}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <SettingsCog />
           </div>
         </div>
