@@ -2,6 +2,8 @@
 // around the Web Speech API for short answers. STT support varies by browser
 // (Chrome and Edge are best). Callers must always provide a keyboard fallback.
 
+import type { Lang } from './types';
+
 export function speak(text: string, opts?: { rate?: number; pitch?: number }): Promise<void> {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     return Promise.resolve();
@@ -31,8 +33,6 @@ export function cancelSpeech() {
 
 const askCache = new Map<string, Blob>();
 let askAudio: HTMLAudioElement | null = null;
-
-import type { Lang } from './types';
 
 export interface AskVoiceOpts {
   language: Lang;

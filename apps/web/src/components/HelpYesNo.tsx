@@ -1,4 +1,8 @@
 import { useState } from 'react';
+// Note: Lang here is the narrow app-UI Lang (en/sv/bg/es/fr) from i18n,
+// NOT the wider story-content Lang from types.ts. HelpYesNo prompts are
+// shown in the UI language, which is governed by the settings cog (en/sv).
+// Callers pass uiLang, never storyLang.
 import type { Lang } from '../i18n';
 import { useT } from '../i18n';
 
