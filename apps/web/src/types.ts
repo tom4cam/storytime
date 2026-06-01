@@ -70,3 +70,9 @@ export interface StorySummary {
   updated_at: string;
   creator_id?: string;
 }
+
+export interface StoryGroupSummary {
+  group_id: string | null;
+  primary: StoryIndex;
+  languages: Lang[];
+}

@@ -7,7 +7,7 @@
 //     {id}-v{n}.mp3        narration audio
 
 import type { Env } from './env';
-import type { StoryIndex, StoryVersion } from './types';
+import type { Lang, StoryGroupSummary, StoryIndex, StoryVersion } from './types';
 
 export async function saveStoryVersion(env: Env, version: StoryVersion): Promise<void> {
   const versionKey = `${version.id}/v${version.version}.json`;
@@ -114,6 +114,39 @@ export async function deleteStoryAndMedia(env: Env, id: string): Promise<{ story
   const mediaList = await env.MEDIA.list({ prefix: `${id}-`, limit: 1000 });
   await Promise.all(mediaList.objects.map((o) => env.MEDIA.delete(o.key)));
   return { story: storyList.objects.length, media: mediaList.objects.length };
+}
+
+export function groupStoryIndexes(
+  indexes: StoryIndex[],
+  preferredLang: Lang | null,
+): StoryGroupSummary[] {
+  const buckets = new Map<string, { groupId: string | null; members: StoryIndex[] }>();
+  for (const idx of indexes) {
+    const key = idx.group_id ?? `__solo:${idx.id}`;
+    const existing = buckets.get(key);
+    if (existing) existing.members.push(idx);
+    else buckets.set(key, { groupId: idx.group_id ?? null, members: [idx] });
+  }
+
+  const groups: StoryGroupSummary[] = [];
+  for (const { groupId, members } of buckets.values()) {
+    const primary = pickPrimary(members, preferredLang);
+    const languages = [...new Set(members.map((m) => m.language))];
+    groups.push({ group_id: groupId, primary, languages });
+  }
+
+  groups.sort((a, b) => (b.primary.updated_at || '').localeCompare(a.primary.updated_at || ''));
+  return groups;
+}
+
+function pickPrimary(members: StoryIndex[], preferredLang: Lang | null): StoryIndex {
+  if (preferredLang) {
+    const match = members.find((m) => m.language === preferredLang);
+    if (match) return match;
+  }
+  const en = members.find((m) => m.language === 'en');
+  if (en) return en;
+  return [...members].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))[0];
 }
 
 // Result of deleting a single version. `removedStory` is true when no

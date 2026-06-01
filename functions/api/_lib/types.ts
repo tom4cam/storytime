@@ -66,3 +66,9 @@ export interface GeneratedStory {
   title: string;
   paragraphs: { text: string; image_prompt: string }[];
 }
+
+export interface StoryGroupSummary {
+  group_id: string | null;
+  primary: StoryIndex;
+  languages: Lang[];
+}
