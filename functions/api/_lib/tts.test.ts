@@ -136,6 +136,69 @@ describe('alignWhisperToSource', () => {
     expect(out.character_end_times_seconds[source.length - 1]).toBeCloseTo(1.0, 5);
   });
 
+  it('rejects whisper anchors whose timestamps disagree with their source position', () => {
+    // Reproduces the King-story v2 failure mode: Whisper lost the leading
+    // ~13s of audio and reported its first surviving word ("was") at t=0
+    // even though it sits ~190 source chars in. Without validation, NW
+    // anchors boundary[char_of_was]=0 and the interpolation stamps a long
+    // run of leading chars with 0. With validation, that anchor is dropped
+    // and timings spread across the full audio.
+    const source =
+      'Once upon a time, in a cheerful little kingdom called Goldenvale, ' +
+      'there lived a King who loved to travel. He had royal carriages ' +
+      'and horses, but he often dreamed about traveling in more comfort. ' +
+      'His very best helper was a friendly old Sorcerer who loved to help.';
+    const whisper: WhisperWord[] = [
+      // Whisper missed the entire opening. Its first surviving recognized
+      // word is "was" near char 190+, but it reports timing from t=0.
+      { word: 'was', start: 0, end: 1.34 },
+      { word: 'a', start: 1.34, end: 1.5 },
+      { word: 'friendly', start: 1.5, end: 1.9 },
+      { word: 'old', start: 1.9, end: 2.1 },
+      { word: 'Sorcerer', start: 2.1, end: 2.6 },
+      { word: 'who', start: 2.6, end: 2.8 },
+      { word: 'loved', start: 2.8, end: 3.1 },
+      { word: 'to', start: 3.1, end: 3.2 },
+      { word: 'help', start: 3.2, end: 3.6 },
+    ];
+    const out = alignWhisperToSource(source, whisper, { totalDuration: 20 });
+    // Leading word "Once" must NOT be stamped at 0/0 — it should get a
+    // sensible positive timestamp from the fallback interpolation.
+    const onceStart = out.character_start_times_seconds[0];
+    const onceEnd = out.character_end_times_seconds[3]; // "Once" is chars 0..3
+    expect(onceStart).toBe(0); // first char anchored to 0
+    expect(onceEnd).toBeGreaterThan(0); // but the word has real duration
+    // Word "helper" (immediately before the bogus "was" anchor) must not
+    // be stamped 0..0 either. It sits before "was" in the source.
+    const helperIdx = source.indexOf('helper');
+    expect(out.character_start_times_seconds[helperIdx]).toBeGreaterThan(0);
+    expect(out.character_end_times_seconds[helperIdx + 5]).toBeGreaterThan(
+      out.character_start_times_seconds[helperIdx]
+    );
+    // Times must be monotonic non-decreasing throughout.
+    for (let i = 1; i < out.character_start_times_seconds.length; i += 1) {
+      expect(out.character_start_times_seconds[i]).toBeGreaterThanOrEqual(
+        out.character_start_times_seconds[i - 1] - 1e-9
+      );
+    }
+  });
+
+  it('clamps tiny FP drift to keep boundaries monotonic', () => {
+    // Two whisper anchors whose end times are out of order by < 1ms;
+    // the final clamp should not amplify it into a backwards step.
+    const source = 'one two';
+    const whisper: WhisperWord[] = [
+      { word: 'one', start: 0, end: 0.5 },
+      { word: 'two', start: 0.499, end: 0.8 },
+    ];
+    const out = alignWhisperToSource(source, whisper);
+    for (let i = 1; i < out.character_end_times_seconds.length; i += 1) {
+      expect(out.character_end_times_seconds[i]).toBeGreaterThanOrEqual(
+        out.character_end_times_seconds[i - 1]
+      );
+    }
+  });
+
   it('returns monotonically non-decreasing character times', () => {
     const source = 'The quick brown fox jumps over the lazy dog.';
     const whisper: WhisperWord[] = [

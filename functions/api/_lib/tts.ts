@@ -264,20 +264,45 @@ export function alignWhisperToSource(
   boundary[0] = 0;
   boundary[n] = totalDur;
 
-  if (whisper.length > 0 && tokens.length > 0) {
+  let usedWhisperAnchors = 0;
+  if (whisper.length > 0 && tokens.length > 0 && totalDur > 0) {
     const matched = alignSequences(
       tokens.map((t) => t.normalized),
       whisper.map((w) => normalize(w.word))
     );
+    // Validate each matched Whisper anchor against a character-uniform
+    // baseline derived from totalDur. Anchors whose timestamps disagree
+    // with their source character position by more than `tol` are dropped.
+    // This protects against the failure mode where Whisper loses a chunk
+    // of audio (e.g. a quiet intro) and reports surviving words starting
+    // at t=0, which would otherwise stamp a long run of leading source
+    // characters with boundary=0 via interpolation.
+    let lastAcceptedEnd = 0;
     for (let i = 0; i < tokens.length; i += 1) {
       const m = matched[i];
-      if (m >= 0) {
-        boundary[tokens[i].startChar] = whisper[m].start;
-        boundary[tokens[i].endChar] = whisper[m].end;
-      }
+      if (m < 0) continue;
+      const tok = tokens[i];
+      const w = whisper[m];
+      const expectedStart = (tok.startChar / n) * totalDur;
+      const expectedEnd = (tok.endChar / n) * totalDur;
+      // Tolerance: max(3s, 40% of the larger expected timestamp). The 3s
+      // floor keeps short stories permissive; the 40% scales for long ones.
+      const tol = Math.max(3, Math.max(expectedStart, expectedEnd) * 0.4);
+      if (Math.abs(w.start - expectedStart) > tol) continue;
+      if (Math.abs(w.end - expectedEnd) > tol) continue;
+      // Monotonicity: an anchor that moves backwards in time vs the last
+      // accepted anchor is almost certainly Whisper losing track of the
+      // clock. Drop it rather than letting interpolation flip.
+      if (w.start + 0.05 < lastAcceptedEnd) continue;
+      boundary[tok.startChar] = w.start;
+      boundary[tok.endChar] = w.end;
+      lastAcceptedEnd = w.end;
+      usedWhisperAnchors += 1;
     }
-  } else if (tokens.length > 0) {
-    // No whisper output — distribute tokens uniformly over totalDur.
+  }
+  if (usedWhisperAnchors === 0 && tokens.length > 0 && totalDur > 0) {
+    // No usable Whisper anchors — fall back to per-token uniform
+    // distribution across totalDur. Same as the "no whisper output" path.
     const per = totalDur / tokens.length;
     for (let i = 0; i < tokens.length; i += 1) {
       const s = i * per;
@@ -298,6 +323,14 @@ export function alignWhisperToSource(
         boundary[k] = startT + ((k - lastKnown) / span) * (endT - startT);
       }
       lastKnown = b;
+    }
+  }
+
+  // Cheap safety pass against FP drift or anchors that landed slightly
+  // out of order: clamp each boundary to be at least the previous one.
+  for (let i = 1; i <= n; i += 1) {
+    if ((boundary[i] as number) < (boundary[i - 1] as number)) {
+      boundary[i] = boundary[i - 1];
     }
   }
 
