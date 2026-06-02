@@ -153,7 +153,10 @@ export async function translateStory(
   try {
     res = await client.messages.create({
       model,
-      max_tokens: 3000,
+      // Generous cap so we never truncate mid tool-call. Non-Latin scripts
+      // (Cyrillic, Devanagari, etc.) tokenize at multiple tokens per char,
+      // so the 3000-token budget could be exhausted by a single story.
+      max_tokens: 16000,
       system:
         `Translate the given children's story into ${targetName} suitable for ages 3-8. ` +
         `Keep proper names (Pip, Marta, Bob, Brennan, Linnéa, etc.) unchanged. ` +
@@ -196,18 +199,23 @@ export async function translateStory(
 function extractTranslationFromResponse(
   res: Anthropic.Messages.Message
 ): TranslatedStoryPayload {
+  const stopReason = res.stop_reason;
   for (const block of res.content) {
     if (block.type === 'tool_use') {
       const input = block.input as { title?: unknown; paragraphs?: unknown } | null;
       if (input && typeof input.title === 'string' && Array.isArray(input.paragraphs)) {
         return { title: input.title, paragraphs: input.paragraphs.map((p) => String(p)) };
       }
-      throw new Error('translation: tool input missing title or paragraphs');
+      if (stopReason === 'max_tokens') {
+        throw new Error('translation: response truncated at max_tokens before tool call completed');
+      }
+      const peek = JSON.stringify(input ?? null).slice(0, 200);
+      throw new Error(`translation: tool input missing title or paragraphs (stop=${stopReason}, peek=${peek})`);
     }
   }
   // Defensive fallback — should not happen with tool_choice forced.
   for (const block of res.content) {
     if (block.type === 'text') return __parseTranslation(block.text);
   }
-  throw new Error('translation: Claude returned neither a tool call nor text');
+  throw new Error(`translation: Claude returned neither a tool call nor text (stop=${stopReason})`);
 }
