@@ -51,6 +51,27 @@ describe('charsToWords', () => {
     expect(out[0]).toMatchObject({ paragraphIndex: 0, wordIndex: 0 });
   });
 
+  it('spreads runs of identical-start words across the gap to the next word', () => {
+    // Simulates a Whisper-compressed region: three source words landed on
+    // the same start time because two surrounding anchors collapsed.
+    // The smoother should redistribute them across the gap to "next".
+    const characters = [...'a b c d'];
+    // chars: a(0) (1) b(2) (3) c(4) (5) d(6)
+    // Force a,b,c to share start=1.0, end varies, and d starts at 4.0.
+    const character_start_times_seconds = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 4.0];
+    const character_end_times_seconds =   [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 4.0];
+    const out = charsToWords(['a b c d'], {
+      characters, character_start_times_seconds, character_end_times_seconds,
+    });
+    // Without the smoother, a/b/c would all have start=end=1.0.
+    expect(out.map((w) => w.word)).toEqual(['a', 'b', 'c', 'd']);
+    expect(out[0].start).toBe(1.0);
+    expect(out[1].start).toBeGreaterThan(out[0].start);
+    expect(out[2].start).toBeGreaterThan(out[1].start);
+    expect(out[2].end).toBeLessThanOrEqual(out[3].start);
+    expect(out[3].start).toBe(4.0);
+  });
+
   it('handles three paragraphs', () => {
     const out = charsToWords(['a b', 'c', 'd e f'], fakeAlignment('a b\n\nc\n\nd e f'));
     expect(out.map((w) => [w.paragraphIndex, w.wordIndex])).toEqual([
