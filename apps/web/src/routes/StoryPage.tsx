@@ -86,8 +86,9 @@ export function StoryPage() {
   const [listed, setListedLocal] = useState<boolean>(story?.listed !== false);
   const [listingError, setListingError] = useState<string | null>(null);
   const [translatePickerOpen, setTranslatePickerOpen] = useState(false);
-  const [translating, setTranslating] = useState(false);
-  const [translateError, setTranslateError] = useState<string | null>(null);
+  const [translatingLangs, setTranslatingLangs] = useState<Set<Lang>>(new Set());
+  const [translatedLangs, setTranslatedLangs] = useState<Map<Lang, { id: string }>>(new Map());
+  const [translateErrors, setTranslateErrors] = useState<Map<Lang, string>>(new Map());
 
   const onSetStars = async (stars: number | null) => {
     if (!story) return;
@@ -101,16 +102,22 @@ export function StoryPage() {
     }
   };
 
-  const onPickTranslation = async (target: 'en' | 'sv' | 'bg' | 'es' | 'fr') => {
+  const onPickTranslation = async (target: Lang) => {
     if (!story) return;
-    setTranslating(true);
-    setTranslateError(null);
+    if (translatingLangs.has(target) || translatedLangs.has(target)) return;
+    setTranslatingLangs((s) => { const n = new Set(s); n.add(target); return n; });
+    setTranslateErrors((m) => { const n = new Map(m); n.delete(target); return n; });
     try {
       const next = await apiTranslate(story.id, target);
-      navigate(`/s/${next.id}`);
+      setTranslatedLangs((m) => { const n = new Map(m); n.set(target, { id: next.id }); return n; });
     } catch (e) {
-      setTranslating(false);
-      setTranslateError(`${t('story.translateError')} (${(e as Error).message})`);
+      setTranslateErrors((m) => {
+        const n = new Map(m);
+        n.set(target, `${t('story.translateError')} (${(e as Error).message})`);
+        return n;
+      });
+    } finally {
+      setTranslatingLangs((s) => { const n = new Set(s); n.delete(target); return n; });
     }
   };
 
@@ -340,23 +347,39 @@ export function StoryPage() {
       {translatePickerOpen && story && (
         <div className="card no-print" style={{ marginTop: 12 }}>
           <div className="question">{t('story.translateChoose')}</div>
-          {translating && <div className="subtle">{t('story.translating')}</div>}
-          {translateError && <div className="error">{translateError}</div>}
           <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 8 }}>
             {(['en','sv','bg','es','fr'] as const)
               .filter((c) => c !== story.language)
-              .map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  className="btn"
-                  disabled={translating}
-                  onClick={() => onPickTranslation(code)}
-                >
-                  {t(`settings.language${code[0].toUpperCase()}${code[1]}` as 'settings.languageEn')}
-                </button>
-              ))}
+              .map((code) => {
+                const label = t(`settings.language${code[0].toUpperCase()}${code[1]}` as 'settings.languageEn');
+                const ready = translatedLangs.get(code);
+                if (ready) {
+                  return (
+                    <Link key={code} to={`/s/${ready.id}`} className="btn">
+                      {t('story.translateOpen', { lang: label })}
+                    </Link>
+                  );
+                }
+                const inFlight = translatingLangs.has(code);
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    className="btn"
+                    disabled={inFlight}
+                    onClick={() => onPickTranslation(code)}
+                  >
+                    {inFlight ? `${label}…` : label}
+                  </button>
+                );
+              })}
           </div>
+          {translatingLangs.size > 0 && (
+            <div className="subtle" style={{ marginTop: 8 }}>{t('story.translating')}</div>
+          )}
+          {Array.from(translateErrors.entries()).map(([code, msg]) => (
+            <div key={code} className="error" style={{ marginTop: 8 }}>{msg}</div>
+          ))}
         </div>
       )}
 

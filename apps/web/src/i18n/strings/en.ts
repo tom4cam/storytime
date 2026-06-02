@@ -99,6 +99,7 @@ export const en = {
   'story.translate': 'Translate',
   'story.translateChoose': 'Translate into:',
   'story.translating': 'Translating...',
+  'story.translateOpen': 'Open {lang} →',
   'story.translateError': 'Translation failed — try again.',
 
   // Edit page

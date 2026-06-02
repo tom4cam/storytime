@@ -78,6 +78,7 @@ export const es = {
   "story.translate": "Traducir",
   "story.translateChoose": "Traducir a:",
   "story.translating": "Traduciendo...",
+  "story.translateOpen": "Abrir {lang} →",
   "story.translateError": "No se pudo traducir — inténtalo de nuevo.",
   "edit.loading": "Cargando el cuento...",
   "edit.notFound": "Cuento no encontrado.",

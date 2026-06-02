@@ -78,6 +78,7 @@ export const fr = {
   "story.translate": "Traduire",
   "story.translateChoose": "Traduire en:",
   "story.translating": "Traduction en cours...",
+  "story.translateOpen": "Ouvrir {lang} →",
   "story.translateError": "La traduction a échoué — réessaie.",
   "edit.loading": "Chargement de l'histoire...",
   "edit.notFound": "Histoire introuvable.",

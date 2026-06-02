@@ -78,6 +78,7 @@ export const bg = {
   "story.translate": "Преведи",
   "story.translateChoose": "Преведи на:",
   "story.translating": "Превежда се...",
+  "story.translateOpen": "Отвори {lang} →",
   "story.translateError": "Преводът не успя — опитай отново.",
   "edit.loading": "Зареждане на историята...",
   "edit.notFound": "Историята не е намерена.",

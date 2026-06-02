@@ -89,6 +89,7 @@ export const sv: Record<StringKey, string> = {
   'story.translate': 'Översätt',
   'story.translateChoose': 'Översätt till:',
   'story.translating': 'Översätter...',
+  'story.translateOpen': 'Öppna {lang} →',
   'story.translateError': 'Översättningen misslyckades — försök igen.',
 
   // Edit page

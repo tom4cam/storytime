@@ -146,6 +146,9 @@ export async function translateStory(
   const targetName = LANG_NAMES[targetLanguage];
   const body = source.paragraphs.map((p, i) => `[${i + 1}] ${p}`).join('\n\n');
 
+  // Use tool-use for structured output. Claude returns a typed object
+  // directly — no embedded JSON to parse, so quotes/newlines inside
+  // translated paragraphs can never break the response.
   let res: Awaited<ReturnType<typeof client.messages.create>>;
   try {
     res = await client.messages.create({
@@ -154,21 +157,57 @@ export async function translateStory(
       system:
         `Translate the given children's story into ${targetName} suitable for ages 3-8. ` +
         `Keep proper names (Pip, Marta, Bob, Brennan, Linnéa, etc.) unchanged. ` +
-        `Return strict JSON with this shape: {"title": "...", "paragraphs": ["...", "...", ...]}. ` +
-        `No prose outside JSON, no code fences. Same number of paragraphs as the source.`,
-      messages: [{ role: 'user', content: `Title: ${source.title}\n\n${body}\n\nReturn JSON.` }],
+        `Call the submit_translation tool with the translated title and one entry per source paragraph, in order. ` +
+        `Return exactly ${source.paragraphs.length} paragraph${source.paragraphs.length === 1 ? '' : 's'}.`,
+      tools: [
+        {
+          name: 'submit_translation',
+          description: 'Submit the translated story.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Translated story title.' },
+              paragraphs: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Translated paragraphs in the same order as the source.',
+              },
+            },
+            required: ['title', 'paragraphs'],
+          },
+        },
+      ],
+      tool_choice: { type: 'tool', name: 'submit_translation' },
+      messages: [{ role: 'user', content: `Title: ${source.title}\n\n${body}` }],
     });
   } catch (e) {
     await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
     throw e;
   }
-  const block = res.content.find((b) => b.type === 'text');
-  if (!block || block.type !== 'text') throw new Error('translation: Claude returned no text');
-  const parsed = __parseTranslation(block.text);
+  const parsed = extractTranslationFromResponse(res);
   if (parsed.paragraphs.length !== source.paragraphs.length) {
     throw new Error(`translation: expected ${source.paragraphs.length} paragraphs, got ${parsed.paragraphs.length}`);
   }
   // Flat rate estimate: $0.01 per translation call.
   void recordCost(env, 'anthropic', 'translation', 0.01);
   return parsed;
+}
+
+function extractTranslationFromResponse(
+  res: Anthropic.Messages.Message
+): TranslatedStoryPayload {
+  for (const block of res.content) {
+    if (block.type === 'tool_use') {
+      const input = block.input as { title?: unknown; paragraphs?: unknown } | null;
+      if (input && typeof input.title === 'string' && Array.isArray(input.paragraphs)) {
+        return { title: input.title, paragraphs: input.paragraphs.map((p) => String(p)) };
+      }
+      throw new Error('translation: tool input missing title or paragraphs');
+    }
+  }
+  // Defensive fallback — should not happen with tool_choice forced.
+  for (const block of res.content) {
+    if (block.type === 'text') return __parseTranslation(block.text);
+  }
+  throw new Error('translation: Claude returned neither a tool call nor text');
 }
