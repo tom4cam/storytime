@@ -146,9 +146,20 @@ export async function translateStory(
   const targetName = LANG_NAMES[targetLanguage];
   const body = source.paragraphs.map((p, i) => `[${i + 1}] ${p}`).join('\n\n');
 
-  // Use tool-use for structured output. Claude returns a typed object
-  // directly — no embedded JSON to parse, so quotes/newlines inside
-  // translated paragraphs can never break the response.
+  // Use tool-use for structured output with one explicit string field per
+  // paragraph (paragraph_1, paragraph_2, ...). An array-of-strings schema
+  // works most of the time but occasionally gets serialized as a stringified
+  // JSON array — especially for non-Latin scripts — and that string can
+  // contain unescaped inner quotes that defeat any downstream parser.
+  // Flat scalar fields sidestep that entire failure mode.
+  const paragraphProps: Record<string, { type: 'string'; description: string }> = {};
+  const required: string[] = ['title'];
+  for (let i = 1; i <= source.paragraphs.length; i++) {
+    const key = `paragraph_${i}`;
+    paragraphProps[key] = { type: 'string', description: `Translation of source paragraph [${i}].` };
+    required.push(key);
+  }
+
   let res: Awaited<ReturnType<typeof client.messages.create>>;
   try {
     res = await client.messages.create({
@@ -160,8 +171,8 @@ export async function translateStory(
       system:
         `Translate the given children's story into ${targetName} suitable for ages 3-8. ` +
         `Keep proper names (Pip, Marta, Bob, Brennan, Linnéa, etc.) unchanged. ` +
-        `Call the submit_translation tool with the translated title and one entry per source paragraph, in order. ` +
-        `Return exactly ${source.paragraphs.length} paragraph${source.paragraphs.length === 1 ? '' : 's'}.`,
+        `Call the submit_translation tool. Fill paragraph_1 through paragraph_${source.paragraphs.length} ` +
+        `with the translation of source paragraphs [1] through [${source.paragraphs.length}] respectively.`,
       tools: [
         {
           name: 'submit_translation',
@@ -170,13 +181,9 @@ export async function translateStory(
             type: 'object',
             properties: {
               title: { type: 'string', description: 'Translated story title.' },
-              paragraphs: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Translated paragraphs in the same order as the source.',
-              },
+              ...paragraphProps,
             },
-            required: ['title', 'paragraphs'],
+            required,
           },
         },
       ],
@@ -187,7 +194,7 @@ export async function translateStory(
     await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
     throw e;
   }
-  const parsed = extractTranslationFromResponse(res);
+  const parsed = extractTranslationFromResponse(res, source.paragraphs.length);
   if (parsed.paragraphs.length !== source.paragraphs.length) {
     throw new Error(`translation: expected ${source.paragraphs.length} paragraphs, got ${parsed.paragraphs.length}`);
   }
@@ -197,21 +204,33 @@ export async function translateStory(
 }
 
 function extractTranslationFromResponse(
-  res: Anthropic.Messages.Message
+  res: Anthropic.Messages.Message,
+  expectedCount: number,
 ): TranslatedStoryPayload {
   const stopReason = res.stop_reason;
   for (const block of res.content) {
     if (block.type === 'tool_use') {
-      const input = block.input as { title?: unknown; paragraphs?: unknown } | null;
+      const input = (block.input ?? null) as Record<string, unknown> | null;
       if (input && typeof input.title === 'string') {
-        const paragraphs = coerceParagraphsArray(input.paragraphs);
-        if (paragraphs) return { title: input.title, paragraphs };
+        const paragraphs: string[] = [];
+        for (let i = 1; i <= expectedCount; i++) {
+          const v = input[`paragraph_${i}`];
+          if (typeof v !== 'string') break;
+          paragraphs.push(v);
+        }
+        if (paragraphs.length === expectedCount) {
+          return { title: input.title, paragraphs };
+        }
+        // Back-compat: accept the older array-of-strings shape too, in case
+        // any caller still configures it that way.
+        const arr = coerceParagraphsArray(input.paragraphs);
+        if (arr && arr.length === expectedCount) return { title: input.title, paragraphs: arr };
       }
       if (stopReason === 'max_tokens') {
         throw new Error('translation: response truncated at max_tokens before tool call completed');
       }
-      const peek = JSON.stringify(input ?? null).slice(0, 200);
-      throw new Error(`translation: tool input missing title or paragraphs (stop=${stopReason}, peek=${peek})`);
+      const got = input ? Object.keys(input).join(',') : 'null';
+      throw new Error(`translation: tool input missing required fields (stop=${stopReason}, keys=${got})`);
     }
   }
   // Defensive fallback — should not happen with tool_choice forced.
@@ -221,8 +240,6 @@ function extractTranslationFromResponse(
   throw new Error(`translation: Claude returned neither a tool call nor text (stop=${stopReason})`);
 }
 
-// Claude occasionally returns `paragraphs` as a stringified JSON array
-// (especially for non-Latin scripts) instead of a real array. Accept either.
 function coerceParagraphsArray(value: unknown): string[] | null {
   if (Array.isArray(value)) return value.map((p) => String(p));
   if (typeof value === 'string') {
