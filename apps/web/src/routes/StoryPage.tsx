@@ -55,7 +55,12 @@ export function StoryPage() {
     pendingPauseRef.current?.();
     pendingPauseRef.current = null;
     el.currentTime = w.start;
-    if (wasPaused) {
+    // Words with degenerate timing (e.g. Whisper alignment failures stamped
+    // (0, 0)) have no usable duration. Falling into the auto-pause path
+    // would pause the audio instantly without playing anything, so for the
+    // paused case we just seek and let the user use the audio controls.
+    const usableDuration = w.end - w.start > 0.05;
+    if (wasPaused && usableDuration) {
       let done = false;
       const finish = () => {
         if (done) return;
@@ -63,6 +68,9 @@ export function StoryPage() {
         el.removeEventListener('timeupdate', onTime);
         window.clearTimeout(timer);
         pendingPauseRef.current = null;
+        // Rewind to the word's start so pressing play resumes from this
+        // word, not from the moment of auto-pause (which sits at w.end).
+        try { el.currentTime = w.start; } catch { /* ignore */ }
       };
       const onTime = () => {
         if (el.currentTime >= w.end) { el.pause(); finish(); }

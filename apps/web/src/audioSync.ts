@@ -6,6 +6,11 @@ import type { WordTiming } from './types';
  *   - Returns -1 if `t` is before the first word's start, or words is empty.
  *   - Returns the previous index when `t` falls in a gap between two words.
  *   - Returns the last index when `t` is past the last word's end.
+ *
+ * When multiple consecutive words share the same start time (e.g. Whisper
+ * alignment failed and assigned 0 to a run of leading words), this picks
+ * the SMALLEST such index. That way at t=0 the first word is highlighted,
+ * not the last word of the broken-alignment run.
  */
 export function findActiveWordIndex(words: WordTiming[], t: number): number {
   if (words.length === 0) return -1;
@@ -17,6 +22,10 @@ export function findActiveWordIndex(words: WordTiming[], t: number): number {
     if (words[mid].start <= t) lo = mid;
     else hi = mid - 1;
   }
+  // Walk back to the first member of the tie group so degenerate alignment
+  // data (a run of words all stamped with the same start) still highlights
+  // the start of the run rather than its end.
+  while (lo > 0 && words[lo - 1].start === words[lo].start) lo--;
   return lo;
 }
 

@@ -44,4 +44,19 @@ describe('findActiveWordIndex', () => {
   it('returns the last index when past the last word end', () => {
     expect(findActiveWordIndex(words, 99)).toBe(3);
   });
+
+  it('picks the smallest index when leading words share a start time', () => {
+    // Simulates Whisper failing to align the first run of words: indexes
+    // 0..3 all stamped (0,0), then 4 has (0, 1.34), then real timing starts.
+    const broken: WordTiming[] = [
+      w(0, 0), w(0, 0), w(0, 0), w(0, 0),
+      w(0, 1.34),
+      w(1.34, 2.0),
+      w(2.0, 2.5),
+    ];
+    expect(findActiveWordIndex(broken, 0)).toBe(0);
+    expect(findActiveWordIndex(broken, 0.5)).toBe(0);
+    expect(findActiveWordIndex(broken, 1.34)).toBe(5);
+    expect(findActiveWordIndex(broken, 2.2)).toBe(6);
+  });
 });
