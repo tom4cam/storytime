@@ -11,7 +11,7 @@ const SENDER = 'storytime alerts <onboarding@resend.dev>';
 const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
 export type AlertKind = 'http_429' | 'http_5xx' | 'network_error';
-export type AlertProvider = 'anthropic' | 'openai' | 'fal';
+export type AlertProvider = 'anthropic' | 'openai' | 'fal' | 'elevenlabs';
 
 export function classifyError(status: number | undefined, err?: Error): AlertKind | null {
   if (status === 429) return 'http_429';

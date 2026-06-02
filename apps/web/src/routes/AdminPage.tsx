@@ -144,10 +144,10 @@ function CostsTab({ token, onAuthError }: { token: string; onAuthError: () => vo
             <strong style={{ display: 'block', marginBottom: 8 }}>By provider</strong>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
-                {(['anthropic', 'openai', 'fal'] as const).map((p) => (
+                {(['anthropic', 'openai', 'fal', 'elevenlabs'] as const).map((p) => (
                   <tr key={p}>
                     <td style={{ padding: '2px 0', color: 'var(--ink-soft)' }}>{p}</td>
-                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(costs.by_provider[p])}</td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(costs.by_provider[p] ?? 0)}</td>
                   </tr>
                 ))}
               </tbody>

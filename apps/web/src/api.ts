@@ -152,7 +152,7 @@ export async function translateStory(
 export interface MonthlyCosts {
   month: string;
   total_usd: number;
-  by_provider: { anthropic: number; openai: number; fal: number };
+  by_provider: { anthropic: number; openai: number; fal: number; elevenlabs: number };
   by_kind: { story_gen: number; translation: number; tts: number; image: number; moderation: number };
   count_by_kind: { story_gen: number; translation: number; tts: number; image: number; moderation: number };
   cost_alerted: boolean;

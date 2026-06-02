@@ -1,7 +1,15 @@
-// Text-to-speech + word-level alignment via OpenAI.
+// Text-to-speech + character-level alignment.
 //
-// Pipeline: text → /v1/audio/speech (tts-1) → MP3, then
-// MP3 → /v1/audio/transcriptions (whisper-1, word timestamps) → words.
+// Provider preference: ElevenLabs first (when ELEVENLABS_API_KEY is set),
+// OpenAI as the always-available fallback.
+//
+// ElevenLabs returns audio + character alignment in a single
+// /with-timestamps call, so no second STT pass is needed. Its alignment
+// shape (characters, character_start_times_seconds, character_end_times_seconds)
+// maps 1:1 to our CharacterAlignment.
+//
+// OpenAI pipeline (fallback): text → /v1/audio/speech (tts-1) → MP3,
+// then MP3 → /v1/audio/transcriptions (whisper-1, word timestamps).
 // Whisper transcribes the audio, not the source, so word strings can drift
 // (names, contractions, multilingual). alignWhisperToSource pairs Whisper
 // words back to source words via Needleman-Wunsch and produces a
@@ -14,10 +22,15 @@ import { requireEnv } from './env';
 import { classifyError, notifyAdminFailure } from './alerts';
 import { recordCost } from './costs';
 
-const TTS_MODEL = 'tts-1';
-const STT_MODEL = 'whisper-1';
-const DEFAULT_VOICE = 'nova';
+const OPENAI_TTS_MODEL = 'tts-1';
+const OPENAI_STT_MODEL = 'whisper-1';
+const OPENAI_DEFAULT_VOICE = 'nova';
 const OPENAI_VOICES = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
+
+const ELEVENLABS_TTS_MODEL = 'eleven_flash_v2_5';
+// Fallback ElevenLabs voice when ELEVENLABS_VOICE_ID is unset and the
+// caller didn't supply an EL-style voice id. "Daniel" — see .env example.
+const ELEVENLABS_DEFAULT_VOICE = 'onwK4e9ZLuTAKqWW03F9';
 
 export interface SynthResult {
   audio: ArrayBuffer;
@@ -41,9 +54,77 @@ interface WhisperResponse {
   text?: string;
 }
 
+interface ElevenLabsResponse {
+  audio_base64: string;
+  alignment?: {
+    characters: string[];
+    character_start_times_seconds: number[];
+    character_end_times_seconds: number[];
+  };
+  normalized_alignment?: {
+    characters: string[];
+    character_start_times_seconds: number[];
+    character_end_times_seconds: number[];
+  };
+}
+
 export async function synthesize(env: Env, text: string, opts: SynthOpts = {}): Promise<SynthResult> {
+  if (env.ELEVENLABS_API_KEY) {
+    try {
+      return await synthesizeWithElevenLabs(env, text, opts);
+    } catch (e) {
+      // Surface to logs so we know the fallback fired, but don't propagate —
+      // the user-facing call should keep working as long as OpenAI is up.
+      console.warn(`[tts] ElevenLabs failed, falling back to OpenAI: ${(e as Error).message}`);
+    }
+  }
+  return synthesizeWithOpenAI(env, text, opts);
+}
+
+async function synthesizeWithElevenLabs(env: Env, text: string, opts: SynthOpts): Promise<SynthResult> {
+  const apiKey = requireEnv(env, 'ELEVENLABS_API_KEY');
+  const voiceId = pickElevenLabsVoice(env, opts.voiceId);
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: ELEVENLABS_TTS_MODEL,
+        output_format: 'mp3_44100_128',
+      }),
+    });
+  } catch (e) {
+    await notifyAdminFailure(env, 'elevenlabs', 'network_error', (e as Error).message);
+    throw e;
+  }
+  if (!res.ok) {
+    const detail = await res.text();
+    const kind = classifyError(res.status);
+    if (kind) await notifyAdminFailure(env, 'elevenlabs', kind, `${res.status}: ${detail.slice(0, 500)}`);
+    throw new Error(`ElevenLabs TTS failed (${res.status}): ${detail.slice(0, 300)}`);
+  }
+  const body = (await res.json()) as ElevenLabsResponse;
+  if (!body.audio_base64) throw new Error('ElevenLabs response missing audio_base64');
+
+  const audio = decodeBase64ToArrayBuffer(body.audio_base64);
+  const alignment = elevenLabsAlignment(text, body);
+  // ElevenLabs Flash v2.5 published rate is ~$30 per 1M characters. This is
+  // an estimate for budgeting; exact billing depends on plan + credit usage.
+  void recordCost(env, 'elevenlabs', 'tts', text.length * 30e-6);
+  return { audio, alignment };
+}
+
+async function synthesizeWithOpenAI(env: Env, text: string, opts: SynthOpts): Promise<SynthResult> {
   const apiKey = requireEnv(env, 'OPENAI_API_KEY');
-  const voice = pickVoice(opts.voiceId);
+  const voice = pickOpenAIVoice(opts.voiceId);
 
   let ttsRes: Response;
   try {
@@ -51,7 +132,7 @@ export async function synthesize(env: Env, text: string, opts: SynthOpts = {}): 
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: TTS_MODEL,
+        model: OPENAI_TTS_MODEL,
         voice,
         input: text,
         response_format: 'mp3',
@@ -72,7 +153,7 @@ export async function synthesize(env: Env, text: string, opts: SynthOpts = {}): 
 
   const form = new FormData();
   form.append('file', new Blob([audio], { type: 'audio/mpeg' }), 'narration.mp3');
-  form.append('model', STT_MODEL);
+  form.append('model', OPENAI_STT_MODEL);
   form.append('response_format', 'verbose_json');
   form.append('timestamp_granularities[]', 'word');
   // Bias Whisper toward the source spellings / names. 224 tokens is the
@@ -104,11 +185,52 @@ export async function synthesize(env: Env, text: string, opts: SynthOpts = {}): 
   return { audio, alignment };
 }
 
-function pickVoice(voiceId: string | undefined): string {
+function pickOpenAIVoice(voiceId: string | undefined): string {
   if (voiceId && OPENAI_VOICES.has(voiceId)) return voiceId;
-  // Legacy ElevenLabs voice ids (and anything unknown) fall back to nova
-  // so old stories keep playing without re-narration.
-  return DEFAULT_VOICE;
+  // ElevenLabs-style ids (and anything unknown) fall back to nova so old
+  // stories and EL-only voice choices keep playing on the OpenAI path.
+  return OPENAI_DEFAULT_VOICE;
+}
+
+function pickElevenLabsVoice(env: Env, voiceId: string | undefined): string {
+  // OpenAI preset names aren't EL voice ids — substitute the env default.
+  if (voiceId && !OPENAI_VOICES.has(voiceId)) return voiceId;
+  return env.ELEVENLABS_VOICE_ID || ELEVENLABS_DEFAULT_VOICE;
+}
+
+function decodeBase64ToArrayBuffer(b64: string): ArrayBuffer {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+// Re-key ElevenLabs' alignment back to the original `text`. ElevenLabs
+// usually returns the source characters verbatim, but if normalization
+// trimmed or expanded the input (e.g. number expansion: "5" → "five")
+// we fall back to interpolating timings across the original text.
+function elevenLabsAlignment(text: string, body: ElevenLabsResponse): CharacterAlignment {
+  const a = body.alignment ?? body.normalized_alignment;
+  const source = [...text];
+  if (!a || !a.characters || a.characters.length === 0) {
+    return {
+      characters: source,
+      character_start_times_seconds: new Array(source.length).fill(0),
+      character_end_times_seconds: new Array(source.length).fill(0),
+    };
+  }
+  if (a.characters.length === source.length && a.characters.join('') === text) {
+    // Exact length match: pass through directly.
+    return {
+      characters: source,
+      character_start_times_seconds: a.character_start_times_seconds.slice(),
+      character_end_times_seconds: a.character_end_times_seconds.slice(),
+    };
+  }
+  // Length mismatch — interpolate to fit. Use the same machinery that
+  // backstops Whisper so the downstream charsToWords contract holds.
+  const totalDur = a.character_end_times_seconds[a.character_end_times_seconds.length - 1] ?? 0;
+  return alignWhisperToSource(text, [], { totalDuration: totalDur });
 }
 
 // --- alignment -------------------------------------------------------------

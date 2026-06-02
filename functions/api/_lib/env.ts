@@ -14,6 +14,15 @@ export interface Env {
   OPENAI_API_KEY: string;
   FAL_KEY: string;
 
+  // Optional: preferred TTS provider. When ELEVENLABS_API_KEY is set,
+  // synthesize() tries ElevenLabs first and falls back to OpenAI tts-1
+  // on any failure. ELEVENLABS_VOICE_ID is the default voice id (e.g.
+  // "onwK4e9ZLuTAKqWW03F9" for Daniel). Used when the requested voice
+  // is one of OpenAI's preset names (alloy/echo/fable/onyx/nova/shimmer)
+  // and therefore not a meaningful ElevenLabs voice id.
+  ELEVENLABS_API_KEY?: string;
+  ELEVENLABS_VOICE_ID?: string;
+
   // Public vars
   ANTHROPIC_MODEL?: string;
 

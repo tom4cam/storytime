@@ -10,7 +10,7 @@
 import type { Env } from './env';
 import { notifyAdminFailure } from './alerts';
 
-export type CostProvider = 'anthropic' | 'openai' | 'fal';
+export type CostProvider = 'anthropic' | 'openai' | 'fal' | 'elevenlabs';
 export type CostKind =
   | 'story_gen'
   | 'translation'
@@ -25,6 +25,7 @@ export interface MonthlyCosts {
     anthropic: number;
     openai: number;
     fal: number;
+    elevenlabs: number;
   };
   by_kind: {
     story_gen: number;
@@ -59,7 +60,7 @@ function emptyMonth(month: string): MonthlyCosts {
   return {
     month,
     total_usd: 0,
-    by_provider: { anthropic: 0, openai: 0, fal: 0 },
+    by_provider: { anthropic: 0, openai: 0, fal: 0, elevenlabs: 0 },
     by_kind: { story_gen: 0, translation: 0, tts: 0, image: 0, moderation: 0 },
     count_by_kind: { story_gen: 0, translation: 0, tts: 0, image: 0, moderation: 0 },
     cost_alerted: false,
@@ -106,13 +107,18 @@ export async function recordCost(
       ? ((await obj.json()) as MonthlyCosts)
       : emptyMonth(month);
 
+    // Backfill defaults so a legacy record missing newer providers
+    // (e.g. elevenlabs added after R2 already held this month's file)
+    // picks up zeros instead of producing NaN on the increment.
+    // Object.assign over spread to silence the duplicate-key TS warning.
+    const providerBase = Object.assign(
+      { anthropic: 0, openai: 0, fal: 0, elevenlabs: 0 },
+      current.by_provider,
+    );
     const updated: MonthlyCosts = {
       ...current,
       total_usd: current.total_usd + usd,
-      by_provider: {
-        ...current.by_provider,
-        [provider]: current.by_provider[provider] + usd,
-      },
+      by_provider: { ...providerBase, [provider]: providerBase[provider] + usd },
       by_kind: {
         ...current.by_kind,
         [kind]: current.by_kind[kind] + usd,
@@ -168,9 +174,10 @@ async function sendCostCapAlert(env: Env, costs: MonthlyCosts, cap: number): Pro
           `Month:   ${costs.month}\n` +
           `Total:   $${costs.total_usd.toFixed(4)} (cap: $${cap})\n\n` +
           `By provider:\n` +
-          `  anthropic: $${costs.by_provider.anthropic.toFixed(4)}\n` +
-          `  openai:    $${costs.by_provider.openai.toFixed(4)}\n` +
-          `  fal:       $${costs.by_provider.fal.toFixed(4)}\n\n` +
+          `  anthropic:  $${(costs.by_provider.anthropic ?? 0).toFixed(4)}\n` +
+          `  openai:     $${(costs.by_provider.openai ?? 0).toFixed(4)}\n` +
+          `  fal:        $${(costs.by_provider.fal ?? 0).toFixed(4)}\n` +
+          `  elevenlabs: $${(costs.by_provider.elevenlabs ?? 0).toFixed(4)}\n\n` +
           `By kind:\n` +
           `  story_gen:   $${costs.by_kind.story_gen.toFixed(4)} (${costs.count_by_kind.story_gen}x)\n` +
           `  translation: $${costs.by_kind.translation.toFixed(4)} (${costs.count_by_kind.translation}x)\n` +
