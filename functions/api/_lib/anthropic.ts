@@ -203,8 +203,9 @@ function extractTranslationFromResponse(
   for (const block of res.content) {
     if (block.type === 'tool_use') {
       const input = block.input as { title?: unknown; paragraphs?: unknown } | null;
-      if (input && typeof input.title === 'string' && Array.isArray(input.paragraphs)) {
-        return { title: input.title, paragraphs: input.paragraphs.map((p) => String(p)) };
+      if (input && typeof input.title === 'string') {
+        const paragraphs = coerceParagraphsArray(input.paragraphs);
+        if (paragraphs) return { title: input.title, paragraphs };
       }
       if (stopReason === 'max_tokens') {
         throw new Error('translation: response truncated at max_tokens before tool call completed');
@@ -218,4 +219,20 @@ function extractTranslationFromResponse(
     if (block.type === 'text') return __parseTranslation(block.text);
   }
   throw new Error(`translation: Claude returned neither a tool call nor text (stop=${stopReason})`);
+}
+
+// Claude occasionally returns `paragraphs` as a stringified JSON array
+// (especially for non-Latin scripts) instead of a real array. Accept either.
+function coerceParagraphsArray(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value.map((p) => String(p));
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.map((p) => String(p));
+      } catch { /* fall through */ }
+    }
+  }
+  return null;
 }
