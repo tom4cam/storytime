@@ -22,10 +22,25 @@ import { requireEnv } from './env';
 import { classifyError, notifyAdminFailure } from './alerts';
 import { recordCost } from './costs';
 
-const OPENAI_TTS_MODEL = 'tts-1';
+const OPENAI_TTS_DEFAULT_MODEL = 'tts-1';
 const OPENAI_STT_MODEL = 'whisper-1';
 const OPENAI_DEFAULT_VOICE = 'nova';
 const OPENAI_VOICES = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
+// Models that accept the `instructions` field for voice steering.
+const OPENAI_STEERABLE_MODELS = new Set(['gpt-4o-mini-tts', 'gpt-4o-tts']);
+const OPENAI_DEFAULT_STEERING =
+  'Read aloud as a warm, gentle British storyteller. ' +
+  'Soft RP accent, calm pacing, expressive but not theatrical — ' +
+  'as if reading a bedtime story to a child.';
+// Rough USD/char for budgeting. tts-1: $15/1M chars. gpt-4o-mini-tts is
+// billed per token (text in + audio out); ~$18/1M source chars is a
+// conservative blended estimate. Exact billing comes from OpenAI invoices.
+const OPENAI_TTS_COST_PER_CHAR: Record<string, number> = {
+  'tts-1': 15e-6,
+  'tts-1-hd': 30e-6,
+  'gpt-4o-mini-tts': 18e-6,
+  'gpt-4o-tts': 30e-6,
+};
 
 const ELEVENLABS_TTS_MODEL = 'eleven_flash_v2_5';
 // Fallback ElevenLabs voice when ELEVENLABS_VOICE_ID is unset and the
@@ -125,6 +140,11 @@ async function synthesizeWithElevenLabs(env: Env, text: string, opts: SynthOpts)
 async function synthesizeWithOpenAI(env: Env, text: string, opts: SynthOpts): Promise<SynthResult> {
   const apiKey = requireEnv(env, 'OPENAI_API_KEY');
   const voice = pickOpenAIVoice(opts.voiceId);
+  const model = env.OPENAI_TTS_MODEL || OPENAI_TTS_DEFAULT_MODEL;
+  const steerable = OPENAI_STEERABLE_MODELS.has(model);
+  const instructions = steerable
+    ? (env.OPENAI_TTS_INSTRUCTIONS || OPENAI_DEFAULT_STEERING)
+    : undefined;
 
   let ttsRes: Response;
   try {
@@ -132,10 +152,11 @@ async function synthesizeWithOpenAI(env: Env, text: string, opts: SynthOpts): Pr
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: OPENAI_TTS_MODEL,
+        model,
         voice,
         input: text,
         response_format: 'mp3',
+        ...(instructions ? { instructions } : {}),
         ...(opts.speed != null ? { speed: opts.speed } : {}),
       }),
     });
@@ -180,8 +201,8 @@ async function synthesizeWithOpenAI(env: Env, text: string, opts: SynthOpts): Pr
   const wh = (await whRes.json()) as WhisperResponse;
 
   const alignment = alignWhisperToSource(text, wh.words ?? [], { totalDuration: wh.duration });
-  // OpenAI TTS-1: $15 / 1_000_000 chars.
-  void recordCost(env, 'openai', 'tts', text.length * 15e-6);
+  const ratePerChar = OPENAI_TTS_COST_PER_CHAR[model] ?? OPENAI_TTS_COST_PER_CHAR['tts-1'];
+  void recordCost(env, 'openai', 'tts', text.length * ratePerChar);
   return { audio, alignment };
 }
 

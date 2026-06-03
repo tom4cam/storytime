@@ -26,6 +26,13 @@ export interface Env {
   // Public vars
   ANTHROPIC_MODEL?: string;
 
+  // Optional OpenAI TTS overrides. OPENAI_TTS_MODEL defaults to "tts-1";
+  // set to "gpt-4o-mini-tts" to enable the steerable model. When the model
+  // is steerable, OPENAI_TTS_INSTRUCTIONS is sent as the `instructions`
+  // field — leave unset to use a warm British storytelling default.
+  OPENAI_TTS_MODEL?: string;
+  OPENAI_TTS_INSTRUCTIONS?: string;
+
   // Optional alerting (Resend). When unset, alerts log a warning and no-op.
   RESEND_API_KEY?: string;
 
