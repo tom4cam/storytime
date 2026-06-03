@@ -1,6 +1,6 @@
 # storytime
 
-A small web app that lets kids make their own illustrated, narrated stories in English or Swedish.
+A small web app that lets kids make their own illustrated, narrated stories in English, French, Spanish, Bulgarian, or Swedish.
 
 A kid picks a language, answers a few simple questions (by voice or by typing), and the app writes a short story, draws a cartoon for each paragraph, and reads it out loud. Each story gets its own link, and stories can be edited into new versions later.
 
