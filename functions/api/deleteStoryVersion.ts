@@ -5,7 +5,7 @@
 // the entire story.
 
 import type { Env } from './_lib/env';
-import { deleteOneStoryVersion, getStoryIndex } from './_lib/storage';
+import { deleteOneStoryVersion, getStoryIndex, getStoryVersion } from './_lib/storage';
 import { isAdminRequest } from './_lib/adminAuth';
 import { recordAdminAction } from './_lib/adminAudit';
 import { badRequest, json, serverError } from './_lib/util';
@@ -30,6 +30,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const idx = await getStoryIndex(env, body.id);
   if (!idx) return badRequest('story not found');
+  // Confirm the specific version blob exists before doing destructive work.
+  // Without this an already-deleted version (stale UI / double-click) would
+  // throw deep inside storage and surface as a 500.
+  const versionBlob = await getStoryVersion(env, body.id, body.version);
+  if (!versionBlob) return badRequest(`version ${body.version} not found`);
 
   try {
     const result = await deleteOneStoryVersion(env, body.id, body.version);

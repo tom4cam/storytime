@@ -196,6 +196,24 @@ export async function adminListFlagged(token: string): Promise<{ flagged: Flagge
   return jsonOrThrow(res);
 }
 
+export interface AdminVersionSummary {
+  version: number;
+  title: string;
+  status: string;
+  created_at: string;
+  is_latest: boolean;
+}
+
+export async function adminListStoryVersions(
+  token: string,
+  id: string
+): Promise<{ id: string; latest_version: number; versions: AdminVersionSummary[] }> {
+  const res = await fetch(`${FN_BASE}/_admin/listStoryVersions?id=${encodeURIComponent(id)}`, {
+    headers: { 'X-Admin-Token': token },
+  });
+  return jsonOrThrow(res);
+}
+
 export async function adminRestoreStory(token: string, id: string): Promise<{ ok: boolean }> {
   const res = await fetch(`${FN_BASE}/_admin/restoreStory`, {
     method: 'POST',
