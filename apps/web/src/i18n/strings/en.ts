@@ -131,6 +131,7 @@ export const en = {
 
   // Navigation
   'nav.back': 'Back',
+  'nav.home': 'Home',
 
   // Audio player
   'audio.play': 'Play',
@@ -146,6 +147,7 @@ export const en = {
   'settings.languageBg': 'Български',
   'settings.languageEs': 'Español',
   'settings.languageFr': 'Français',
+  'settings.languageIt': 'Italiano',
   'settings.slow': 'Speech speed',
   'settings.slowOn': 'Slow',
   'settings.slowOff': 'Normal',

@@ -26,14 +26,16 @@ describe('resolveInitialLang', () => {
     expect(resolveInitialLang('en-US', '')).toBe('en');
   });
 
-  it('resolves browser locales for bg, es, and fr', () => {
+  it('resolves browser locales for bg, es, fr, and it', () => {
     expect(resolveInitialLang('bg', null)).toBe('bg');
     expect(resolveInitialLang('es-MX', null)).toBe('es');
     expect(resolveInitialLang('fr-CA', null)).toBe('fr');
+    expect(resolveInitialLang('it-IT', null)).toBe('it');
   });
 
-  it('honours a stored valid lang for any of the five codes', () => {
+  it('honours a stored valid lang for any of the six codes', () => {
     expect(resolveInitialLang('en-US', 'bg')).toBe('bg');
+    expect(resolveInitialLang('en-US', 'it')).toBe('it');
   });
 });
 

@@ -513,6 +513,24 @@ ul.answer-list li b { color: var(--ink-soft); }
   box-shadow: var(--shadow);
 }
 .cog-btn:hover { background: var(--accent-soft); }
+
+/* Home button (top-right, sits beside the language picker/cog) */
+.home-btn {
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  width: 48px; height: 48px;
+  font-size: 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  color: var(--ink);
+}
+.home-btn:hover { background: var(--accent-soft); }
+.home-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,24,88,0.12); }
 .cog-popover {
   position: absolute;
   right: 0;

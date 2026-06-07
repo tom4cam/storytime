@@ -39,7 +39,7 @@ export function SettingsCog() {
           <div className="cog-row">
             <span className="cog-label">{t('settings.language')}</span>
             <div className="cog-pills">
-              {(['en', 'sv', 'bg', 'es', 'fr'] as const).map((code) => (
+              {(['en', 'sv', 'bg', 'es', 'fr', 'it'] as const).map((code) => (
                 <button
                   key={code}
                   type="button"

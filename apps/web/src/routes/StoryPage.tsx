@@ -8,7 +8,7 @@ import { getCreatorId } from '../creatorId';
 import { isAdmin } from '../adminToken';
 import { ConfirmTyped } from '../components/ConfirmTyped';
 import { useAudioSync } from '../audioSync';
-import { useLang, useT } from '../i18n';
+import { useLang, useT, type Lang as UiLang } from '../i18n';
 import { LOCALES } from '../i18n/locales';
 import { LANG_FLAG } from '../lang';
 import type { Lang, StoryVersionWithSiblings, WordTiming } from '../types';
@@ -568,7 +568,7 @@ function renderParagraph(
   });
 }
 
-function formatDate(s: string, lang: 'en' | 'sv' | 'bg' | 'es' | 'fr'): string {
+function formatDate(s: string, lang: UiLang): string {
   try {
     const d = new Date(s);
     return d.toLocaleDateString(LOCALES[lang], { month: 'short', day: 'numeric', year: 'numeric' });

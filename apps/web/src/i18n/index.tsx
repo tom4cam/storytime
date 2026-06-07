@@ -4,19 +4,24 @@ import { sv } from './strings/sv';
 import { bg } from './strings/bg';
 import { es } from './strings/es';
 import { fr } from './strings/fr';
+import { it } from './strings/it';
 
-export type Lang = 'en' | 'sv' | 'bg' | 'es' | 'fr';
+export type Lang = 'en' | 'sv' | 'bg' | 'es' | 'fr' | 'it';
 const STORAGE_KEY = 'storyMaker.lang';
 
-const TABLES: Record<Lang, Record<StringKey, string>> = { en, sv, bg, es, fr };
+const TABLES: Record<Lang, Record<StringKey, string>> = { en, sv, bg, es, fr, it };
 
 export function resolveInitialLang(navigatorLang: string, stored: string | null): Lang {
-  if (stored === 'en' || stored === 'sv' || stored === 'bg' || stored === 'es' || stored === 'fr') return stored;
+  if (
+    stored === 'en' || stored === 'sv' || stored === 'bg' ||
+    stored === 'es' || stored === 'fr' || stored === 'it'
+  ) return stored;
   const nav = navigatorLang.toLowerCase();
   if (nav.startsWith('sv')) return 'sv';
   if (nav.startsWith('bg')) return 'bg';
   if (nav.startsWith('es')) return 'es';
   if (nav.startsWith('fr')) return 'fr';
+  if (nav.startsWith('it')) return 'it';
   return 'en';
 }
 

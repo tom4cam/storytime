@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useT, useLang } from '../i18n';
 import type { Lang as UiLang } from '../i18n';
@@ -7,7 +7,7 @@ import { SettingsCog } from './SettingsCog';
 import { BookLogo } from './BookLogo';
 import { LANG_FLAG } from '../lang';
 
-const UI_LANGS = ['en', 'sv', 'bg', 'es', 'fr'] as const satisfies readonly UiLang[];
+const UI_LANGS = ['en', 'sv', 'bg', 'es', 'fr', 'it'] as const satisfies readonly UiLang[];
 
 interface Props {
   children: ReactNode;
@@ -18,6 +18,8 @@ export function Layout({ children, showExit = false }: Props) {
   const t = useT();
   const { lang: uiLang, setLang } = useLang();
   const navigate = useNavigate();
+  const location = useLocation();
+  const onHome = location.pathname === '/';
   const [langOpen, setLangOpen] = useState(false);
   const langPickerRef = useRef<HTMLDivElement | null>(null);
 
@@ -67,6 +69,16 @@ export function Layout({ children, showExit = false }: Props) {
             </button>
           )}
           <div className="header-row">
+            {!onHome && (
+              <Link
+                to="/"
+                className="home-btn"
+                aria-label={t('nav.home')}
+                title={t('nav.home')}
+              >
+                <span aria-hidden="true">{'🏠'}</span>
+              </Link>
+            )}
             <div className="lang-picker" ref={langPickerRef}>
               <button
                 type="button"

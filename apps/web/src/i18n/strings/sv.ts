@@ -121,6 +121,7 @@ export const sv: Record<StringKey, string> = {
 
   // Navigation
   'nav.back': 'Tillbaka',
+  'nav.home': 'Hem',
 
   // Audio player
   'audio.play': 'Spela',
@@ -136,6 +137,7 @@ export const sv: Record<StringKey, string> = {
   'settings.languageBg': 'Български',
   'settings.languageEs': 'Español',
   'settings.languageFr': 'Français',
+  'settings.languageIt': 'Italiano',
   'settings.slow': 'Talhastighet',
   'settings.slowOn': 'Långsam',
   'settings.slowOff': 'Normal',
