@@ -817,18 +817,36 @@ ul.answer-list li b { color: var(--ink-soft); }
 .lang-popover-flag { font-size: 24px; line-height: 1; }
 
 /* Star ratings */
-.star-row { display: inline-flex; gap: 6px; margin-top: 8px; }
+.star-row { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
 .star {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 28px;
+  font-size: 32px;
   color: var(--ink-soft);
-  padding: 4px 6px;
+  padding: 6px 10px;
   line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .star--on { color: var(--sun); }
 .star:hover { color: var(--accent-deep); }
+.star-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--ink-soft);
+  padding: 6px 10px;
+  margin-left: 4px;
+  line-height: 1;
+  min-width: 32px;
+  min-height: 32px;
+}
+.star-clear:hover { color: var(--accent-deep); }
 
 .tile-stars {
   display: block;

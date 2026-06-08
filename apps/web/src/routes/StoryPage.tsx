@@ -270,11 +270,22 @@ export function StoryPage() {
               className={`star${(story.stars ?? 0) >= n ? ' star--on' : ''}`}
               aria-label={`${n} star${n === 1 ? '' : 's'}`}
               aria-pressed={(story.stars ?? 0) >= n}
-              onClick={() => onSetStars(story.stars === n ? null : n)}
+              onClick={() => onSetStars(n)}
             >
               {(story.stars ?? 0) >= n ? '★' : '☆'}
             </button>
           ))}
+          {(story.stars ?? 0) > 0 && (
+            <button
+              type="button"
+              className="star-clear"
+              aria-label="Clear rating"
+              title="Clear rating"
+              onClick={() => onSetStars(null)}
+            >
+              {'✕'}
+            </button>
+          )}
         </div>
       )}
       <div className="story-meta">
