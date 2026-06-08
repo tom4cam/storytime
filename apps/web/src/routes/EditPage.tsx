@@ -21,7 +21,8 @@ export function EditPage() {
   const [paragraphs, setParagraphs] = useState<DraftParagraph[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -32,7 +33,7 @@ export function EditPage() {
         setSummary(s.summary ?? '');
         setParagraphs(s.paragraphs.map((p) => ({ ...p })));
       })
-      .catch((e) => setError((e as Error).message))
+      .catch((e) => setLoadError((e as Error).message))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -48,7 +49,7 @@ export function EditPage() {
   const save = async () => {
     if (!id) return;
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     try {
       const next = await updateStory(
         id,
@@ -64,15 +65,21 @@ export function EditPage() {
       navigate(isOwner ? `/s/${next.id}` : `/s/${next.id}/v/${next.version}`);
     } catch (e) {
       setSaving(false);
-      setError((e as Error).message);
+      const msg = (e as Error).message || 'Unknown error';
+      const looksLikeTimeout = /load failed|network|timeout|fetch/i.test(msg);
+      setSaveError(
+        looksLikeTimeout
+          ? `${msg}. The save can take a minute or two when many images are regenerated — try again, and your edits below are still here.`
+          : msg
+      );
     }
   };
 
   if (loading) {
     return <Layout><div className="card loading"><div className="spinner" /><p>{t('edit.loading')}</p></div></Layout>;
   }
-  if (error || !story) {
-    return <Layout><div className="error">{error ?? t('edit.notFound')}</div></Layout>;
+  if (loadError || !story) {
+    return <Layout><div className="error">{loadError ?? t('edit.notFound')}</div></Layout>;
   }
   if (saving) {
     return (
@@ -136,10 +143,16 @@ export function EditPage() {
         </div>
       ))}
 
+      {saveError && (
+        <div className="error" role="alert" style={{ marginTop: 16 }}>
+          {saveError}
+        </div>
+      )}
+
       <div className="row" style={{ justifyContent: 'center', marginTop: 24 }}>
         <Link to={`/s/${story.id}`} className="btn ghost">{t('edit.cancel')}</Link>
         <button type="button" className="btn sun" onClick={save}>
-          {isOwner ? t('edit.saveInPlace') : t('edit.save')}
+          {saveError ? 'Try saving again' : isOwner ? t('edit.saveInPlace') : t('edit.save')}
         </button>
       </div>
     </Layout>

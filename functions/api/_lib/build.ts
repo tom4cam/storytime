@@ -15,7 +15,16 @@ export class ModerationError extends Error {
   constructor(message: string) { super(message); this.name = 'ModerationError'; }
 }
 
-const FAL_CONCURRENCY = 6;
+const FAL_CONCURRENCY = 10;
+
+// Strips the "Cartoon illustration. Characters: ... Scene: ... Style: ..."
+// wrapper that earlier versions saved on top of the base scene description.
+// Without this, every subsequent edit would re-wrap the already-wrapped
+// prompt, growing it without bound and eventually outrunning FAL.
+function unwrapImagePrompt(p: string): string {
+  const m = p.match(/^Cartoon illustration\. Characters: [^]*? Scene: ([^]*?) Style: bright colors, friendly faces, cartoon style, no text in the image\.\s*$/);
+  return m ? m[1].trim() : p;
+}
 
 export async function moderateAnswers(env: Env, answers: StoryAnswer[]): Promise<void> {
   const joined = answers.map((a) => a.answer).join('\n\n');
@@ -130,7 +139,7 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
         return { text: p.text, image_url: p.image_url, image_prompt: p.image_prompt } satisfies Paragraph;
       }
       const basePrompt = p.image_prompt && p.image_prompt.trim().length > 0
-        ? p.image_prompt
+        ? unwrapImagePrompt(p.image_prompt)
         : await regenerateImagePrompt(env, p.text, title);
       const summary = opts.summary?.trim();
       const prompt = summary
@@ -138,7 +147,7 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
         : basePrompt;
       const img = await generateImage(env, prompt);
       const url = await storeMedia(env, `${id}-v${opts.version}-p${i + 1}.png`, img.data, img.contentType);
-      return { text: p.text, image_url: url, image_prompt: prompt } satisfies Paragraph;
+      return { text: p.text, image_url: url, image_prompt: basePrompt } satisfies Paragraph;
     }));
     for (let j = 0; j < results.length; j += 1) paragraphs[start + j] = results[j];
   }
