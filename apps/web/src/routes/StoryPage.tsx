@@ -367,7 +367,7 @@ export function StoryPage() {
         <div className="card no-print" style={{ marginTop: 12 }}>
           <div className="question">{t('story.translateChoose')}</div>
           <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', gap: 8 }}>
-            {(['en','sv','bg','es','fr'] as const)
+            {(['en','sv','bg','es','fr','it'] as const)
               .filter((c) => c !== story.language)
               .map((code) => {
                 const label = t(`settings.language${code[0].toUpperCase()}${code[1]}` as 'settings.languageEn');
