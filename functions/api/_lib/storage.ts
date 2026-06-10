@@ -89,8 +89,15 @@ export async function storeMedia(
   const buf: ArrayBuffer = data instanceof ArrayBuffer
     ? data
     : (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer);
-  await env.MEDIA.put(keyWithExt, buf, { httpMetadata: { contentType } });
-  return `/api/media?key=${encodeURIComponent(keyWithExt)}`;
+  const put = await env.MEDIA.put(keyWithExt, buf, { httpMetadata: { contentType } });
+  // Cache-bust on overwrite: owner edits reuse the same R2 key, so without
+  // a per-content suffix the immutable Cache-Control on /api/media would
+  // pin the browser and Cloudflare edge to the previous bytes forever.
+  // R2's PUT etag is the MD5 of the upload for non-multipart writes; an
+  // 8-char prefix is plenty unique per key.
+  const tag = put?.etag?.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)
+    || Date.now().toString(36);
+  return `/api/media?key=${encodeURIComponent(keyWithExt)}&v=${tag}`;
 }
 
 export async function readMedia(env: Env, key: string): Promise<{ data: ArrayBuffer; contentType: string } | null> {
