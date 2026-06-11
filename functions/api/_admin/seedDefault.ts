@@ -6,6 +6,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { Env } from '../_lib/env';
+import { constantTimeEqual } from '../_lib/adminAuth';
 import { regenerateImagePrompt } from '../_lib/anthropic';
 import { buildAndSaveVersion } from '../_lib/build';
 import { badRequest, json, serverError } from '../_lib/util';
@@ -128,7 +129,7 @@ export const onRequestPost: PagesFunction<SeedEnv> = async ({ request, env }) =>
   try { body = (await request.json()) as { which?: string; token?: string; sync?: boolean }; }
   catch (e) { return badRequest((e as Error).message || 'Bad JSON'); }
   if (!env.SEED_ADMIN_TOKEN) return serverError('SEED_ADMIN_TOKEN not configured');
-  if (body.token !== env.SEED_ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+  if (!body.token || !constantTimeEqual(body.token, env.SEED_ADMIN_TOKEN)) return new Response('Forbidden', { status: 403 });
   if (body.which !== 'bob' && body.which !== 'pip') return badRequest('which must be "bob" or "pip"');
 
   // Synchronous mode: wait for the whole pipeline (up to ~5min on

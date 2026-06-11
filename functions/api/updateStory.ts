@@ -4,8 +4,10 @@
 
 import type { Env } from './_lib/env';
 import { buildAndSaveVersion, saveFailedVersion, saveGeneratingStub } from './_lib/build';
+import { CAP_REACHED_MESSAGE, isOverMonthlyCap } from './_lib/costs';
 import { getStoryIndex, getStoryVersion } from './_lib/storage';
 import { readCreatorId } from './_lib/creatorId';
+import { toPublicStory } from './_lib/publicStory';
 import { badRequest, json, notFound, serverError } from './_lib/util';
 
 interface UpdateStoryRequest {
@@ -21,6 +23,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   catch (e) { return badRequest((e as Error).message || 'Bad JSON'); }
   if (!body.id) return badRequest('Missing story id');
   if (!Array.isArray(body.paragraphs) || body.paragraphs.length === 0) return badRequest('paragraphs must be a non empty array');
+
+  if (await isOverMonthlyCap(env)) return json({ error: CAP_REACHED_MESSAGE }, 429);
 
   const idx = await getStoryIndex(env, body.id);
   if (!idx) return notFound('That story does not exist.');
@@ -75,7 +79,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       group_id: previous.group_id,
       rhyme: previous.rhyme,
     });
-    return json(story, 200);
+    return json(toPublicStory(story, cookieId), 200);
   } catch (e) {
     console.error('update build failed', e);
     // Only record a failed version when we were creating a new one. For
@@ -87,7 +91,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           creator_id: previous.creator_id,
           listed: previous.listed,
           group_id: previous.group_id,
-          error: `Something went wrong while saving the new version: ${(e as Error).message}`,
+          error: 'Something went wrong while saving the new version. Please try again.',
         });
       } catch (saveErr) { console.error('Could not record failure state', saveErr); }
     }

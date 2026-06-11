@@ -129,7 +129,7 @@ export function CreatePage() {
 
   const seriesBanner = seriesParam && (
     <div className="series-badge" style={{ display: 'block', marginBottom: 16 }}>
-      {sourceTitle ? `This will be a sequel to "${sourceTitle}"` : 'This will be added to a series'}
+      {sourceTitle ? t('create.seriesSequel', { title: sourceTitle }) : t('create.seriesBanner')}
     </div>
   );
 

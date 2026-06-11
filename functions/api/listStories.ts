@@ -2,6 +2,8 @@
 
 import type { Env } from './_lib/env';
 import { listStoryIndexes, groupStoryIndexes } from './_lib/storage';
+import { readCreatorId } from './_lib/creatorId';
+import { toPublicIndex } from './_lib/publicStory';
 import { LANGS, type Lang, type StoryGroupSummary } from './_lib/types';
 import { json } from './_lib/util';
 
@@ -20,5 +22,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       return (b.primary.updated_at || '').localeCompare(a.primary.updated_at || '');
     });
   }
-  return json(groups);
+  const requesterId = readCreatorId(request);
+  return json(groups.map((g) => ({ ...g, primary: toPublicIndex(g.primary, requesterId) })));
 };

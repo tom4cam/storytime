@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { getStory, updateStory } from '../api';
 import { useT } from '../i18n';
-import { getCreatorId } from '../creatorId';
 import type { Paragraph, StoryVersion } from '../types';
 import { imageAlt } from '../imageAlt';
 
@@ -37,10 +36,7 @@ export function EditPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const isOwner = useMemo(
-    () => !!story?.creator_id && getCreatorId() === story.creator_id,
-    [story],
-  );
+  const isOwner = !!story?.is_owner;
 
   const updateParagraph = (i: number, patch: Partial<DraftParagraph>) => {
     setParagraphs((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
@@ -65,13 +61,9 @@ export function EditPage() {
       navigate(isOwner ? `/s/${next.id}` : `/s/${next.id}/v/${next.version}`);
     } catch (e) {
       setSaving(false);
-      const msg = (e as Error).message || 'Unknown error';
+      const msg = (e as Error).message || t('error.generic');
       const looksLikeTimeout = /load failed|network|timeout|fetch/i.test(msg);
-      setSaveError(
-        looksLikeTimeout
-          ? `${msg}. The save can take a minute or two when many images are regenerated — try again, and your edits below are still here.`
-          : msg
-      );
+      setSaveError(looksLikeTimeout ? `${msg}. ${t('edit.saveTimeoutHint')}` : msg);
     }
   };
 
@@ -152,7 +144,7 @@ export function EditPage() {
       <div className="row" style={{ justifyContent: 'center', marginTop: 24 }}>
         <Link to={`/s/${story.id}`} className="btn ghost">{t('edit.cancel')}</Link>
         <button type="button" className="btn sun" onClick={save}>
-          {saveError ? 'Try saving again' : isOwner ? t('edit.saveInPlace') : t('edit.save')}
+          {saveError ? t('edit.tryAgain') : isOwner ? t('edit.saveInPlace') : t('edit.save')}
         </button>
       </div>
     </Layout>

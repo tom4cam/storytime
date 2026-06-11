@@ -13,6 +13,9 @@ export const en = {
   'home.recentEmpty': 'No stories yet. Tap the big yellow button to make the first one.',
   'home.filterAll': 'All recent',
   'home.filterMine': 'Just mine',
+  'home.sortLabel': 'Sort stories',
+  'home.sortRecent': 'Most recent',
+  'home.sortStars': 'Top rated',
 
   // Create page chrome
   'create.langStepTitle': 'Pick a language for your story.',
@@ -38,6 +41,8 @@ export const en = {
   'create.allSetHint': 'Tap "Make my story" to put it all together.',
   'create.sending': 'Sending it off to the storytellers...',
   'create.typeOrSpeak': 'Please type or speak an answer first.',
+  'create.seriesSequel': 'This will be a sequel to "{title}"',
+  'create.seriesBanner': 'This will be added to a series',
 
   // Question prompts (the create flow's six original questions; SV mirror in sv.ts)
   'q.hero.prompt': 'Who is the hero of your story?',
@@ -65,6 +70,7 @@ export const en = {
   'story.backHome': 'Back to home',
   'story.makingTitle': 'Making your story...',
   'story.makingHint': 'Writing the words, drawing the pictures, and recording the voice. This takes about a minute. The page will refresh on its own.',
+  'story.tookTooLong': 'This is taking longer than usual. Please check back in a little while, or try making a new story.',
   'story.failedTitle': 'Something went wrong.',
   'story.failedDefault': 'The story could not be made this time.',
   'story.tryNew': 'Try a new one',
@@ -118,6 +124,8 @@ export const en = {
   'edit.save': 'Save as new version',
   'edit.saveInPlace': 'Save edits',
   'edit.savingInPlace': 'Saving will update this story in place (no new version).',
+  'edit.tryAgain': 'Try saving again',
+  'edit.saveTimeoutHint': 'Saving can take a minute or two when many pictures are redrawn. Your edits are still here — try again.',
 
   // Not found page
   'notFound.title': 'That page got lost in the woods.',
@@ -128,6 +136,7 @@ export const en = {
   'mic.stop': 'Stop recording',
   'mic.unavailable': 'Voice input is not supported in this browser. You can still type your answer. (Chrome and Edge work best for voice.)',
   'mic.notHeard': 'Sorry, I did not catch that. Please try again.',
+  'mic.placeholder': 'Type your answer, or tap the microphone.',
 
   // Navigation
   'nav.back': 'Back',

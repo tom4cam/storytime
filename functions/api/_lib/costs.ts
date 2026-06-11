@@ -91,6 +91,30 @@ export async function resetMonthlyCosts(env: Env): Promise<MonthlyCosts> {
 
 const DEFAULT_CAP_USD = 10;
 
+export function monthlyCapUsd(env: Env): number {
+  const capStr = env.MONTHLY_COST_LIMIT_USD;
+  const cap = capStr ? parseFloat(capStr) : DEFAULT_CAP_USD;
+  return Number.isFinite(cap) && cap > 0 ? cap : DEFAULT_CAP_USD;
+}
+
+// Circuit breaker: true when this month's recorded spend has reached the cap.
+// Call before kicking off any paid pipeline (story build, translation, TTS).
+// The cap alert in recordCost only emails the admin; this is the part that
+// actually stops new spending. Fails open on read errors — a broken R2 read
+// shouldn't take the whole app down.
+export async function isOverMonthlyCap(env: Env): Promise<boolean> {
+  try {
+    const costs = await getCurrentMonthlyCosts(env);
+    return costs.total_usd >= monthlyCapUsd(env);
+  } catch {
+    return false;
+  }
+}
+
+// Friendly 429 body shared by the endpoints that gate on the cap.
+export const CAP_REACHED_MESSAGE =
+  'The story maker has reached its monthly budget. New stories will be possible again next month.';
+
 export async function recordCost(
   env: Env,
   provider: CostProvider,
@@ -135,8 +159,7 @@ export async function recordCost(
     });
 
     // Check monthly cap and send alert if crossed for the first time.
-    const capStr = env.MONTHLY_COST_LIMIT_USD;
-    const cap = capStr ? parseFloat(capStr) : DEFAULT_CAP_USD;
+    const cap = monthlyCapUsd(env);
     if (!updated.cost_alerted && updated.total_usd >= cap) {
       await sendCostCapAlert(env, updated, cap);
       // Flip the alerted flag.

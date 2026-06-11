@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { listStories } from '../api';
 import { useT, useLang } from '../i18n';
-import { getCreatorId } from '../creatorId';
 import { LANG_FLAG } from '../lang';
 import type { Lang, StoryGroupSummary } from '../types';
 
@@ -15,7 +14,6 @@ export function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [showMineOnly, setShowMineOnly] = useState(false);
   const [sort, setSort] = useState<'recent' | 'stars'>('recent');
-  const myId = getCreatorId();
 
   useEffect(() => {
     setLoaded(false);
@@ -26,12 +24,12 @@ export function HomePage() {
   }, [uiLang, sort]);
 
   const ownedCount = useMemo(
-    () => recent.filter((g) => g.primary.creator_id === myId).length,
-    [recent, myId]
+    () => recent.filter((g) => g.primary.is_mine).length,
+    [recent]
   );
   const visible = useMemo(
-    () => (showMineOnly ? recent.filter((g) => g.primary.creator_id === myId) : recent),
-    [recent, myId, showMineOnly]
+    () => (showMineOnly ? recent.filter((g) => g.primary.is_mine) : recent),
+    [recent, showMineOnly]
   );
 
   return (
@@ -47,10 +45,10 @@ export function HomePage() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as 'recent' | 'stars')}
-          aria-label="Sort stories"
+          aria-label={t('home.sortLabel')}
         >
-          <option value="recent">Most recent</option>
-          <option value="stars">Top rated</option>
+          <option value="recent">{t('home.sortRecent')}</option>
+          <option value="stars">{t('home.sortStars')}</option>
         </select>
       </div>
       {ownedCount > 0 && (

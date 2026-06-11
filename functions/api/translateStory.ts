@@ -7,8 +7,10 @@
 import type { Env } from './_lib/env';
 import { translateStory as runTranslation } from './_lib/anthropic';
 import { buildAndSaveVersion } from './_lib/build';
+import { CAP_REACHED_MESSAGE, isOverMonthlyCap } from './_lib/costs';
 import { getStoryVersion, saveStoryVersion } from './_lib/storage';
 import { readCreatorId } from './_lib/creatorId';
+import { toPublicStory } from './_lib/publicStory';
 import { LANGS, type Lang } from './_lib/types';
 import { badRequest, json, serverError } from './_lib/util';
 
@@ -27,6 +29,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!body.id || typeof body.id !== 'string') return badRequest('id required');
   const target = body.target_language as Lang;
   if (!VALID_LANGS.has(target)) return badRequest(`target_language must be one of: ${LANGS.join(', ')}`);
+
+  if (await isOverMonthlyCap(env)) return json({ error: CAP_REACHED_MESSAGE }, 429);
 
   try {
     const source = await getStoryVersion(env, body.id, body.version);
@@ -67,7 +71,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       })),
     });
 
-    return json(newVersion);
+    return json(toPublicStory(newVersion, readCreatorId(request)));
   } catch (e) {
     console.error('translateStory failed', e);
     return serverError((e as Error).message);

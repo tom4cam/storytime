@@ -15,8 +15,11 @@ export function badRequest(message: string): Response {
   return json({ error: message }, 400);
 }
 
-export function serverError(message: string): Response {
-  return json({ error: message }, 500);
+// Logs the real failure for debugging but returns a generic message —
+// provider error bodies and storage internals are not for end users.
+export function serverError(detail: string): Response {
+  console.error(`[5xx] ${detail}`);
+  return json({ error: 'Something went wrong on our side. Please try again.' }, 500);
 }
 
 export function notFound(message = 'Not found'): Response {

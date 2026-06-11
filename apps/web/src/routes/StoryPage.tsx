@@ -4,7 +4,6 @@ import { Layout } from '../components/Layout';
 import { AudioBar, type AudioBarRef } from '../components/AudioBar';
 import { ShareButton } from '../components/ShareButton';
 import { deleteStory, deleteStoryVersion, getStory, setStars as apiSetStars, translateStory as apiTranslate, updateStoryListing } from '../api';
-import { getCreatorId } from '../creatorId';
 import { isAdmin } from '../adminToken';
 import { ConfirmTyped } from '../components/ConfirmTyped';
 import { useAudioSync } from '../audioSync';
@@ -15,6 +14,8 @@ import type { Lang, StoryVersionWithSiblings, WordTiming } from '../types';
 import { imageAlt } from '../imageAlt';
 
 const POLL_INTERVAL_MS = 10000;
+// ~6 minutes of polling before giving up on a "generating" story.
+const MAX_POLL_ATTEMPTS = 36;
 
 export function StoryPage() {
   const t = useT();
@@ -86,8 +87,7 @@ export function StoryPage() {
     }
     void el.play();
   };
-  const myId = getCreatorId();
-  const isOwner = !!story?.creator_id && story.creator_id !== 'system' && story.creator_id === myId;
+  const isOwner = !!story?.is_owner;
   const admin = isAdmin();
   const [adminAction, setAdminAction] = useState<null | { kind: 'version'; version: number } | { kind: 'story' }>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
@@ -135,6 +135,7 @@ export function StoryPage() {
     setError(null);
     setStory(null);
     let cancelled = false;
+    let attempts = 0;
     const v = version ? parseInt(version, 10) : undefined;
 
     const tick = () => {
@@ -144,6 +145,14 @@ export function StoryPage() {
           setStory(s);
           setLoading(false);
           if (s.status === 'generating') {
+            attempts += 1;
+            // A build takes ~1 minute; if it's still "generating" after
+            // ~6 minutes the backend almost certainly died mid-build.
+            // Stop polling instead of spinning forever.
+            if (attempts >= MAX_POLL_ATTEMPTS) {
+              setError(t('story.tookTooLong'));
+              return;
+            }
             pollingRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
           }
         })
@@ -159,6 +168,7 @@ export function StoryPage() {
       cancelled = true;
       if (pollingRef.current) window.clearTimeout(pollingRef.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, version]);
 
   // Toggle a body class while an audio bar is mounted, so global padding

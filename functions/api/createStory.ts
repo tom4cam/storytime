@@ -5,7 +5,9 @@
 
 import type { Env } from './_lib/env';
 import { buildFromAnswers, ModerationError, moderateAnswers, saveFailedVersion, saveGeneratingStub } from './_lib/build';
+import { CAP_REACHED_MESSAGE, isOverMonthlyCap } from './_lib/costs';
 import { readCreatorId } from './_lib/creatorId';
+import { toPublicStory } from './_lib/publicStory';
 import { getStoryIndex, getStoryVersion, listStoryIndexes, saveStoryVersion } from './_lib/storage';
 import { LANGS } from './_lib/types';
 import type { Lang, StoryAnswer } from './_lib/types';
@@ -32,6 +34,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .filter((a) => a && typeof a.answer === 'string' && a.answer.trim().length > 0)
     .map((a) => ({ question: String(a.question || ''), answer: a.answer.trim() }));
   if (trimmed.length < 3) return badRequest('At least three answers are required to make a story.');
+
+  // Hard budget gate before any paid call. recordCost's alert only emails
+  // the admin; this is what actually stops runaway spending.
+  if (await isOverMonthlyCap(env)) return json({ error: CAP_REACHED_MESSAGE }, 429);
 
   try { await moderateAnswers(env, trimmed); }
   catch (e) {
@@ -103,11 +109,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         console.error('Could not tag source story with series info', tagErr);
       }
     }
-    return json(story, 200);
+    return json(toPublicStory(story, creator_id ?? null), 200);
   } catch (e) {
+    // The stored error is shown on the public story page — keep it generic
+    // and let the console carry the provider details.
     const message = e instanceof ModerationError
       ? e.message
-      : `Something went wrong while making the story: ${(e as Error).message}`;
+      : 'Something went wrong while making the story. Please try a new one.';
     console.error('build failed', e);
     try {
       await saveFailedVersion(env, {

@@ -843,8 +843,11 @@ ul.answer-list li b { color: var(--ink-soft); }
   padding: 6px 10px;
   margin-left: 4px;
   line-height: 1;
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .star-clear:hover { color: var(--accent-deep); }
 

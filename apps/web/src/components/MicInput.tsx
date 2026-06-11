@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '../i18n';
 import { LOCALES } from '../i18n/locales';
 import { listenOnce, speechRecognitionAvailable, type ListenHandle } from '../speech';
 import type { Lang } from '../types';
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function MicInput({ value, onChange, placeholder, ariaLabel, language }: Props) {
+  const t = useT();
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const handleRef = useRef<ListenHandle | null>(null);
@@ -48,7 +50,7 @@ export function MicInput({ value, onChange, placeholder, ariaLabel, language }: 
         <textarea
           aria-label={ariaLabel}
           value={value}
-          placeholder={placeholder ?? 'Type your answer, or tap the microphone.'}
+          placeholder={placeholder ?? t('mic.placeholder')}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
           style={{ flex: 1, minWidth: 0 }}
@@ -57,19 +59,16 @@ export function MicInput({ value, onChange, placeholder, ariaLabel, language }: 
           <button
             type="button"
             className={`mic-button ${listening ? 'listening' : ''}`}
-            aria-label={listening ? 'Stop recording' : 'Speak your answer'}
+            aria-label={listening ? t('mic.stop') : t('mic.start')}
             onClick={listening ? stopListening : startListening}
-            title={listening ? 'Tap to stop' : 'Tap to speak'}
+            title={listening ? t('mic.stop') : t('mic.start')}
           >
             {listening ? '■' : '\u{1F3A4}'}
           </button>
         )}
       </div>
       {!supported && (
-        <div className="note">
-          Voice input is not supported in this browser. You can still type your
-          answer. (Chrome and Edge work best for voice.)
-        </div>
+        <div className="note">{t('mic.unavailable')}</div>
       )}
       {error && <div className="error">{error}</div>}
     </div>

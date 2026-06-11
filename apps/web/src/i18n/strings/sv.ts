@@ -122,6 +122,15 @@ export const sv: Record<StringKey, string> = {
   // Navigation
   'nav.back': 'Tillbaka',
   'nav.home': 'Hem',
+  'home.sortLabel': 'Sortera sagor',
+  'home.sortRecent': 'Senaste',
+  'home.sortStars': 'Högst betyg',
+  'create.seriesSequel': 'Det här blir en uppföljare till "{title}"',
+  'create.seriesBanner': 'Det här läggs till i en serie',
+  'story.tookTooLong': 'Det här tar längre tid än vanligt. Titta tillbaka om en liten stund, eller prova att göra en ny saga.',
+  'edit.tryAgain': 'Försök spara igen',
+  'edit.saveTimeoutHint': 'Att spara kan ta en minut eller två när många bilder ritas om. Dina ändringar finns kvar — försök igen.',
+  'mic.placeholder': 'Skriv ditt svar, eller tryck på mikrofonen.',
 
   // Audio player
   'audio.play': 'Spela',

@@ -2,6 +2,7 @@ import type { Env } from './env';
 import { requireEnv } from './env';
 import { classifyError, notifyAdminFailure } from './alerts';
 import { recordCost } from './costs';
+import { fetchWithRetry } from './retry';
 
 interface ModerationResult { flagged: boolean; reasons: string[] }
 interface OpenAIModerationResponse { results: Array<{ flagged: boolean; categories: Record<string, boolean> }> }
@@ -11,11 +12,11 @@ export async function moderate(env: Env, text: string): Promise<ModerationResult
   const apiKey = requireEnv(env, 'OPENAI_API_KEY');
   let res: Response;
   try {
-    res = await fetch('https://api.openai.com/v1/moderations', {
+    res = await fetchWithRetry('https://api.openai.com/v1/moderations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'omni-moderation-latest', input: text }),
-    });
+    }, { timeoutMs: 15_000 });
   } catch (e) {
     await notifyAdminFailure(env, 'openai', 'network_error', (e as Error).message);
     throw e;

@@ -2,6 +2,8 @@
 
 import type { Env } from './_lib/env';
 import { getStoryVersion, listStoryIndexes } from './_lib/storage';
+import { readCreatorId } from './_lib/creatorId';
+import { toPublicStory } from './_lib/publicStory';
 import type { Lang } from './_lib/types';
 import { badRequest, json, notFound } from './_lib/util';
 
@@ -37,5 +39,5 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     series = { series_id: story.series_id, position: story.series_position, members };
   }
 
-  return json({ ...story, siblings, series });
+  return json({ ...toPublicStory(story, readCreatorId(request)), siblings, series });
 };

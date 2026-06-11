@@ -43,7 +43,9 @@ export interface StoryVersion {
   narration_words?: WordTiming[];
   voice_id?: string;
   summary?: string;
-  creator_id?: string;
+  // Server-computed from the creator_id cookie; the raw creator_id is
+  // never sent to the client (it doubles as the ownership credential).
+  is_owner?: boolean;
   listed?: boolean;
   group_id?: string;
   rhyme?: boolean;
@@ -61,7 +63,7 @@ export interface StoryIndex {
   created_at: string;
   status: StoryStatus;
   language: Lang;
-  creator_id?: string;
+  is_mine?: boolean;
   listed?: boolean;
   group_id?: string;
   stars?: number;
@@ -75,7 +77,6 @@ export interface StorySummary {
   latest_version: number;
   cover_image_url: string | null;
   updated_at: string;
-  creator_id?: string;
 }
 
 export interface StoryGroupSummary {
