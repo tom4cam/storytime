@@ -16,11 +16,26 @@ export function HomePage() {
   const [sort, setSort] = useState<'recent' | 'stars'>('recent');
 
   useEffect(() => {
-    setLoaded(false);
-    listStories(uiLang as Lang, sort)
-      .then(setRecent)
-      .catch(() => { /* swallow */ })
-      .finally(() => setLoaded(true));
+    let cancelled = false;
+    const load = (showSpinner: boolean) => {
+      if (showSpinner) setLoaded(false);
+      listStories(uiLang as Lang, sort)
+        .then((r) => { if (!cancelled) setRecent(r); })
+        .catch(() => { /* swallow */ })
+        .finally(() => { if (!cancelled) setLoaded(true); });
+    };
+    load(true);
+    // Re-fetch when the tab regains focus so a tile for a story deleted in
+    // another view (its list was loaded before the delete) clears itself
+    // instead of lingering and 404-ing on click. Silent: no spinner flash.
+    const onFocus = () => { if (document.visibilityState === 'visible') load(false); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
   }, [uiLang, sort]);
 
   const ownedCount = useMemo(

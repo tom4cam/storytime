@@ -817,20 +817,24 @@ ul.answer-list li b { color: var(--ink-soft); }
 .lang-popover-flag { font-size: 24px; line-height: 1; }
 
 /* Star ratings */
-.star-row { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
+.star-row { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .star {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 32px;
+  font-size: 36px;
   color: var(--ink-soft);
-  padding: 6px 10px;
+  padding: 8px 12px;
   line-height: 1;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 52px;
+  min-height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Remove the 300ms mobile tap delay and double-tap-zoom so taps register
+     immediately on the star the user actually touched. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .star--on { color: var(--sun); }
 .star:hover { color: var(--accent-deep); }
@@ -838,16 +842,18 @@ ul.answer-list li b { color: var(--ink-soft); }
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink-soft);
-  padding: 6px 10px;
+  padding: 8px 12px;
   margin-left: 4px;
   line-height: 1;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 52px;
+  min-height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .star-clear:hover { color: var(--accent-deep); }
 

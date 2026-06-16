@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { AudioBar, type AudioBarRef } from '../components/AudioBar';
 import { ShareButton } from '../components/ShareButton';
-import { deleteStory, deleteStoryVersion, getStory, setStars as apiSetStars, translateStory as apiTranslate, updateStoryListing } from '../api';
+import { ApiError, deleteStory, deleteStoryVersion, getStory, setStars as apiSetStars, translateStory as apiTranslate, updateStoryListing } from '../api';
 import { isAdmin } from '../adminToken';
 import { ConfirmTyped } from '../components/ConfirmTyped';
 import { useAudioSync } from '../audioSync';
@@ -158,7 +158,10 @@ export function StoryPage() {
         })
         .catch((e) => {
           if (cancelled) return;
-          setError((e as Error).message);
+          // A deleted (or never-existent) story 404s. Surface the friendly
+          // "no longer exists" copy rather than the raw "Request failed (404)".
+          if (e instanceof ApiError && e.status === 404) setError(t('story.notFound'));
+          else setError((e as Error).message);
           setLoading(false);
         });
     };
