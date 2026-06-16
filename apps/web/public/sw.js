@@ -1,6 +1,6 @@
 // Storytime service worker. Manual cache strategies — no workbox.
 // Bumping this version string invalidates all caches.
-const VERSION = 'storytime-v1';
+const VERSION = 'storytime-v2';
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const API_CACHE = `${VERSION}-api`;
@@ -81,19 +81,22 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // SPA navigation: serve the shell index.html for any in-app route.
+  // SPA navigation: network-first so a fresh deploy's index.html (and the new
+  // hashed JS bundle it points at) is loaded as soon as the user is online.
+  // Cache-first here pinned the old bundle and hid newly shipped features;
+  // we fall back to the cached shell only when the network is unavailable.
   if (request.mode === 'navigate') {
     event.respondWith(
       (async () => {
+        try {
+          const fresh = await fetch(request);
+          if (fresh && fresh.ok) {
+            caches.open(SHELL_CACHE).then((c) => c.put('/', fresh.clone())).catch(() => {});
+            return fresh;
+          }
+        } catch { /* offline — fall back to cached shell */ }
         const cached = await caches.match('/');
-        if (cached) {
-          // Refresh shell in the background.
-          fetch(request).then((r) => {
-            if (r.ok) caches.open(SHELL_CACHE).then((c) => c.put('/', r.clone()));
-          }).catch(() => {});
-          return cached;
-        }
-        return fetch(request);
+        return cached || fetch(request);
       })(),
     );
     return;
@@ -101,6 +104,12 @@ self.addEventListener('fetch', (event) => {
 
   if (isMutationOrAdmin(url)) return;       // network-only
   if (isAsset(url)) { event.respondWith(cacheFirst(request, ASSET_CACHE)); return; }
-  if (isMediaApi(url)) { event.respondWith(cacheFirst(request, MEDIA_CACHE)); return; }
+  if (isMediaApi(url)) {
+    // Range requests (audio seeking) must reach the network so the browser
+    // gets a real 206; serving a cached full 200 to them would defeat seeking.
+    if (request.headers.has('range')) return;
+    event.respondWith(cacheFirst(request, MEDIA_CACHE));
+    return;
+  }
   if (isListOrGetStoryApi(url)) { event.respondWith(staleWhileRevalidate(request, API_CACHE)); return; }
 });

@@ -143,7 +143,9 @@ export const AudioBar = forwardRef<AudioBarRef, Props>(function AudioBar({ src }
       <div className="audio-time">
         {formatTime(currentTime)} / {formatTime(duration)}
       </div>
-      <audio ref={audioRef} src={src} preload="metadata" hidden />
+      {/* preload the whole (short) clip so per-word tap-to-play can seek
+          immediately instead of snapping to the start before data arrives */}
+      <audio ref={audioRef} src={src} preload="auto" hidden />
     </div>
   );
 });
