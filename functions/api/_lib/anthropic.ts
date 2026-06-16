@@ -106,6 +106,35 @@ export async function generateStory(
   return parsed;
 }
 
+// Derive a character bible for an existing story (one without one — created
+// before the bible feature). Returns concrete, fixed visual descriptions of
+// each named character, one per line.
+export async function generateCharacterBible(
+  env: Env,
+  opts: { title: string; paragraphs: string[] },
+): Promise<string> {
+  const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
+  const client = new Anthropic({ apiKey });
+  const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const body = opts.paragraphs.map((p, i) => `[${i + 1}] ${p}`).join('\n\n');
+  let response: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    response = await client.messages.create({
+      model,
+      max_tokens: 400,
+      system: 'You are a character designer for a children\'s cartoon. Given a story, list each named character on its own line with a concrete, unchanging visual look: species or age, hair, eye and skin color, and a signature outfit with colors. One short clause per character, for example "Mo: a small brown mouse with big round ears and a red scarf." Infer reasonable, consistent details where the story is silent. Return only the descriptions, no preamble and no JSON.',
+      messages: [{ role: 'user', content: `Title: ${opts.title}\n\n${body}` }],
+    });
+  } catch (e) {
+    await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
+    throw e;
+  }
+  const block = response.content.find((b) => b.type === 'text');
+  if (!block || block.type !== 'text') return '';
+  void recordCost(env, 'anthropic', 'story_gen', 0.005);
+  return block.text.trim().replace(/^"|"$/g, '');
+}
+
 export async function regenerateImagePrompt(
   env: Env,
   paragraphText: string,
