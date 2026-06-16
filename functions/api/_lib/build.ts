@@ -45,11 +45,13 @@ export async function saveGeneratingStub(env: Env, opts: {
   voiceId?: string;
   creator_id?: string;
   listed?: boolean;
+  group_id?: string;
+  title?: string;
 }): Promise<StoryVersion> {
   const stub: StoryVersion = {
     id: opts.id,
     version: opts.version,
-    title: 'Your new story',
+    title: opts.title ?? 'Your new story',
     paragraphs: [],
     narration_url: null,
     source_answers: opts.sourceAnswers,
@@ -59,6 +61,7 @@ export async function saveGeneratingStub(env: Env, opts: {
     ...(opts.voiceId ? { voice_id: opts.voiceId } : {}),
     ...(opts.creator_id ? { creator_id: opts.creator_id } : {}),
     ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
+    ...(opts.group_id ? { group_id: opts.group_id } : {}),
   };
   await saveStoryVersion(env, stub);
   return stub;

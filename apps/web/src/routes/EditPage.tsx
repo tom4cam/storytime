@@ -45,30 +45,55 @@ export function EditPage() {
   };
 
   const save = async () => {
-    if (!id) return;
+    if (!id || !story) return;
     setSaving(true);
     setSaveError(null);
-    try {
-      const next = await updateStory(
-        id,
-        paragraphs.map((p) => ({
-          text: p.text,
-          image_url: p.regenerate_image ? null : p.image_url,
-          image_prompt: p.image_prompt,
-          regenerate_image: !!p.regenerate_image,
-          regenerate_text: !!p.regenerate_text,
-          change_instruction: p.change_instruction?.trim() || undefined,
-        })),
-        title,
-        summary
-      );
-      navigate(isOwner ? `/s/${next.id}` : `/s/${next.id}/v/${next.version}`);
-    } catch (e) {
+
+    // updateStory saves a "generating" stub up front, then rebuilds (~60s) in
+    // the same request. We fire it and keep the promise alive in the
+    // background — an in-flight fetch survives client-side navigation, so the
+    // build finishes server-side even after we leave. As soon as the stub is
+    // surely saved we navigate to the story page, which polls until it's ready,
+    // so the user can watch it regenerate instead of waiting on a spinner.
+    const targetVersion = isOwner ? story.version : story.version + 1;
+    const dest = isOwner ? `/s/${id}` : `/s/${id}/v/${targetVersion}`;
+
+    const request = updateStory(
+      id,
+      paragraphs.map((p) => ({
+        text: p.text,
+        image_url: p.regenerate_image ? null : p.image_url,
+        image_prompt: p.image_prompt,
+        regenerate_image: !!p.regenerate_image,
+        regenerate_text: !!p.regenerate_text,
+        change_instruction: p.change_instruction?.trim() || undefined,
+      })),
+      title,
+      summary
+    );
+
+    // Race the request against a short timer. A fast failure (validation,
+    // network, over the monthly cap) keeps us on the edit page with the form
+    // intact; once the stub is up (well under this) we navigate away.
+    const STUB_READY_MS = 1500;
+    const outcome = await Promise.race([
+      request.then(() => ({ kind: 'done' as const })).catch((e: unknown) => ({ kind: 'error' as const, error: e as Error })),
+      new Promise<{ kind: 'pending' }>((resolve) => setTimeout(() => resolve({ kind: 'pending' }), STUB_READY_MS)),
+    ]);
+
+    if (outcome.kind === 'error') {
       setSaving(false);
-      const msg = (e as Error).message || t('error.generic');
+      const msg = outcome.error.message || t('error.generic');
       const looksLikeTimeout = /load failed|network|timeout|fetch/i.test(msg);
       setSaveError(looksLikeTimeout ? `${msg}. ${t('edit.saveTimeoutHint')}` : msg);
+      return;
     }
+
+    // Build still running (or already done). Keep the background request from
+    // surfacing as an unhandled rejection — any failure is reflected on the
+    // story page (owner edits revert; new versions show a failed state).
+    request.catch(() => { /* handled server-side */ });
+    navigate(dest);
   };
 
   if (loading) {
