@@ -58,6 +58,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let seriesId: string | undefined;
   let seriesPosition: number | undefined;
   let sourceStoryIdToTag: string | undefined; // source story that needs series tagging if position=1
+  let priorStoryId: string | undefined; // earlier installment whose character looks the sequel inherits
   if (body.series_id) {
     // body.series_id can be either:
     //   (a) an existing series UUID already stored on other stories, or
@@ -72,6 +73,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       seriesId = body.series_id;
       const maxPos = existingMembers.reduce((acc, m) => Math.max(acc, m.series_position ?? 1), 1);
       seriesPosition = maxPos + 1;
+      // Inherit looks from the latest installment in the matching language.
+      const langMembers = existingMembers.filter((m) => m.language === body.language);
+      const pool = langMembers.length > 0 ? langMembers : existingMembers;
+      priorStoryId = [...pool].sort((a, b) => (b.series_position ?? 1) - (a.series_position ?? 1))[0]?.id;
     } else {
       // Starting a new series — body.series_id is treated as the source story id.
       const sourceIndex = await getStoryIndex(env, body.series_id);
@@ -80,7 +85,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       seriesId = crypto.randomUUID();
       seriesPosition = 2; // new story is part 2; source will become part 1
       sourceStoryIdToTag = body.series_id;
+      priorStoryId = body.series_id;
     }
+  }
+
+  // Pull the earlier installment's character bible so returning characters keep
+  // the same look in the sequel's images.
+  let priorCharacters: string | undefined;
+  if (priorStoryId) {
+    try { priorCharacters = (await getStoryVersion(env, priorStoryId))?.character_bible; }
+    catch (e) { console.error('could not load prior character bible', e); }
   }
 
   try { await saveGeneratingStub(env, { id, version: 1, sourceAnswers: trimmed, language: body.language, voiceId, creator_id, listed: true }); }
@@ -97,7 +111,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // background body on this configuration, leaving stories stuck in
   // "generating" forever.
   try {
-    const story = await buildFromAnswers(env, id, trimmed, body.language, voiceId, creator_id, rhyme, seriesId, seriesPosition);
+    const story = await buildFromAnswers(env, id, trimmed, body.language, voiceId, creator_id, rhyme, seriesId, seriesPosition, priorCharacters);
     // If we started a new series, tag the source story as position 1.
     if (sourceStoryIdToTag && seriesId) {
       try {

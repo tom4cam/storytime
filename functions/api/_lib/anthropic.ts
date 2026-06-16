@@ -23,6 +23,7 @@ Strict rules:
 JSON shape:
 {
   "title": "A short, fun title under 8 words",
+  "character_bible": "Concrete, unchanging look for each named character, one short clause each. Include species or age, hair, eye and skin color, and a signature outfit with colors. Example: 'Mo: a small brown mouse with big round ears and a red scarf. Lily: a girl, age 6, with curly black hair, brown eyes, and a yellow dress.'",
   "paragraphs": [
     {
       "text": "The paragraph text.",
@@ -31,7 +32,9 @@ JSON shape:
   ]
 }
 
-Image prompts: describe one clear scene per paragraph in cartoon style, child friendly, around 20 words. Mention the main character and the setting each time so the illustrator stays consistent.`;
+Image prompts: describe one clear scene per paragraph in cartoon style, child friendly, around 20 words. Mention the main character and the setting each time.
+
+Character consistency (very important): First lock in each named character's look and put it in "character_bible". Then, in every image_prompt, describe each character who appears using the SAME look from the bible, with the same words for hair, colors, and clothing. A character must look identical across all the images. Only change a character's described look if the story itself changes it (for example they put on a costume or get a haircut), and only from that paragraph onward.`;
 
 const LANG_NAMES: Record<Lang, string> = {
   en: 'English',
@@ -45,7 +48,13 @@ const LANG_NAMES: Record<Lang, string> = {
   'pt-PT': 'European Portuguese (português de Portugal)',
 };
 
-export async function generateStory(env: Env, answers: StoryAnswer[], language: Lang, rhyme: boolean): Promise<GeneratedStory> {
+export async function generateStory(
+  env: Env,
+  answers: StoryAnswer[],
+  language: Lang,
+  rhyme: boolean,
+  priorCharacters?: string,
+): Promise<GeneratedStory> {
   const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
   const client = new Anthropic({ apiKey });
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
@@ -56,17 +65,21 @@ export async function generateStory(env: Env, answers: StoryAnswer[], language: 
   const rhymeInstruction = rhyme
     ? 'Write every paragraph as a short rhyming verse in simple AABB couplets suitable for ages 3-6. Keep the rhymes natural — do not stretch the sentence just to force a rhyme.'
     : 'Write in clear, warm prose suitable for ages 3-6.';
+  // For a sequel, returning characters MUST keep the look they had before.
+  const sequelInstruction = priorCharacters && priorCharacters.trim()
+    ? `\n\nThis is a sequel. These characters already appeared and must look the same. Reuse these descriptions word for word for returning characters in "character_bible" and in every image_prompt, and add any new characters:\n${priorCharacters.trim()}`
+    : '';
 
   let response: Awaited<ReturnType<typeof client.messages.create>>;
   try {
     response = await client.messages.create({
       model,
-      max_tokens: 2500,
+      max_tokens: 3000,
       system: STORY_SYSTEM_PROMPT,
       messages: [
         {
           role: 'user',
-          content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\n${rhymeInstruction}\n\nReturn only the JSON object.`,
+          content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\n${rhymeInstruction}${sequelInstruction}\n\nReturn only the JSON object.`,
         },
       ],
     });

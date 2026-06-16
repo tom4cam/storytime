@@ -113,6 +113,7 @@ interface BuildOptions {
   creator_id?: string;
   listed?: boolean;
   summary?: string;
+  character_bible?: string;
   group_id?: string;
   rhyme?: boolean;
   series_id?: string;
@@ -179,9 +180,12 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
       const basePrompt = reuseSaved
         ? unwrapImagePrompt(p.image_prompt as string)
         : await regenerateImagePrompt(env, finalText, title, instruction);
-      const summary = opts.summary?.trim();
-      const prompt = summary
-        ? `Cartoon illustration. Characters: ${summary} Scene: ${basePrompt} Style: bright colors, friendly faces, cartoon style, no text in the image.`
+      // Anchor every image on the same character descriptions (the bible keeps
+      // characters consistent across this story and its sequels; the optional
+      // user summary supplements it).
+      const anchor = [opts.character_bible?.trim(), opts.summary?.trim()].filter(Boolean).join(' ');
+      const prompt = anchor
+        ? `Cartoon illustration. Characters: ${anchor} Scene: ${basePrompt} Style: bright colors, friendly faces, cartoon style, no text in the image.`
         : basePrompt;
       const img = await generateImage(env, prompt);
       const url = await storeMedia(env, `${id}-v${opts.version}-p${i + 1}.png`, img.data, img.contentType);
@@ -207,6 +211,7 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
     ...(opts.creator_id ? { creator_id: opts.creator_id } : {}),
     ...(opts.listed !== undefined ? { listed: opts.listed } : {}),
     ...(opts.summary && opts.summary.trim() ? { summary: opts.summary.trim() } : {}),
+    ...(opts.character_bible && opts.character_bible.trim() ? { character_bible: opts.character_bible.trim() } : {}),
     ...(opts.group_id ? { group_id: opts.group_id } : {}),
     ...(opts.rhyme ? { rhyme: true } : {}),
     ...(opts.series_id ? { series_id: opts.series_id } : {}),
@@ -258,6 +263,7 @@ export async function propagateEditToTranslations(env: Env, edited: StoryVersion
         rhyme: member.rhyme,
         series_id: member.series_id,
         series_position: member.series_position,
+        character_bible: edited.character_bible,
         // Reuse the edited story's images (translations share image keys) and
         // its prompts; only the text is translated and narration re-synthesized.
         paragraphs: edited.paragraphs.map((p, i) => ({
@@ -283,9 +289,10 @@ export async function buildFromAnswers(
   rhyme = false,
   series_id?: string,
   series_position?: number,
+  priorCharacters?: string,
 ): Promise<StoryVersion> {
   await moderateAnswers(env, answers);
-  const generated = await safelyGenerate(env, answers, language, rhyme);
+  const generated = await safelyGenerate(env, answers, language, rhyme, priorCharacters);
   return buildAndSaveVersion(env, {
     id,
     version: 1,
@@ -298,12 +305,13 @@ export async function buildFromAnswers(
     rhyme,
     series_id,
     series_position,
+    character_bible: generated.character_bible,
     paragraphs: generated.paragraphs.map((p) => ({ text: p.text, image_prompt: p.image_prompt, image_url: null })),
   });
 }
 
-async function safelyGenerate(env: Env, answers: StoryAnswer[], language: Lang, rhyme: boolean): Promise<GeneratedStory> {
-  const generated = await generateStory(env, answers, language, rhyme);
+async function safelyGenerate(env: Env, answers: StoryAnswer[], language: Lang, rhyme: boolean, priorCharacters?: string): Promise<GeneratedStory> {
+  const generated = await generateStory(env, answers, language, rhyme, priorCharacters);
   const fullText = `${generated.title}\n\n${generated.paragraphs.map((p) => p.text).join('\n\n')}`;
   const result = await moderate(env, fullText);
   if (result.flagged) {

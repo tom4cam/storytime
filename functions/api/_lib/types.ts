@@ -43,6 +43,10 @@ export interface StoryVersion {
   narration_words?: WordTiming[];
   voice_id?: string;
   summary?: string;
+  // Concrete, unchanging visual descriptions of each named character, injected
+  // into every image prompt so a character looks the same across all of a
+  // story's images — and inherited by sequels so they match too.
+  character_bible?: string;
   creator_id?: string;
   listed?: boolean;
   group_id?: string;
@@ -72,6 +76,7 @@ export interface StoryIndex {
 export interface GeneratedStory {
   title: string;
   paragraphs: { text: string; image_prompt: string }[];
+  character_bible?: string;
 }
 
 export interface StoryGroupSummary {
