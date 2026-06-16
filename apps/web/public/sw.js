@@ -1,6 +1,6 @@
 // Storytime service worker. Manual cache strategies — no workbox.
 // Bumping this version string invalidates all caches.
-const VERSION = 'storytime-v2';
+const VERSION = 'storytime-v3';
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const API_CACHE = `${VERSION}-api`;
@@ -31,9 +31,12 @@ function isAsset(url) {
          url.pathname === '/manifest.webmanifest';
 }
 
-function isListOrGetStoryApi(url) {
-  return url.pathname === '/api/listStories' ||
-         url.pathname === '/api/getStory';
+function isListStoriesApi(url) {
+  return url.pathname === '/api/listStories';
+}
+
+function isGetStoryApi(url) {
+  return url.pathname === '/api/getStory';
 }
 
 function isMediaApi(url) {
@@ -54,6 +57,24 @@ async function cacheFirst(request, cacheName) {
     cache.put(request, response.clone()).catch(() => {});
   }
   return response;
+}
+
+// Network-first: always try the server (so freshly saved edits show up
+// immediately), falling back to the cached copy only when offline.
+async function networkFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  try {
+    const fresh = await fetch(request);
+    if (fresh.ok) cache.put(request, fresh.clone()).catch(() => {});
+    return fresh;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    return new Response(JSON.stringify({ error: 'offline' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 async function staleWhileRevalidate(request, cacheName) {
@@ -111,5 +132,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirst(request, MEDIA_CACHE));
     return;
   }
-  if (isListOrGetStoryApi(url)) { event.respondWith(staleWhileRevalidate(request, API_CACHE)); return; }
+  // A just-saved story must reflect the edit, so getStory is network-first.
+  if (isGetStoryApi(url)) { event.respondWith(networkFirst(request, API_CACHE)); return; }
+  if (isListStoriesApi(url)) { event.respondWith(staleWhileRevalidate(request, API_CACHE)); return; }
 });

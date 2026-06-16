@@ -197,6 +197,40 @@ export interface DeleteVersionResult {
 // `index.json` from the highest remaining version (carrying its title,
 // cover image, status, listed flag). If no versions remain, hard-delete
 // the entire story.
+// Pull the bucket key out of an `/api/media?key=...&v=...` URL.
+function mediaKeyFromUrl(u: string | null | undefined): string | null {
+  if (!u) return null;
+  const m = /[?&]key=([^&]+)/.exec(u);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+// Collect every media key referenced by any *surviving* story version (across
+// all stories — translations share image keys by URL). `excludeVersionKey` is
+// the `{id}/v{n}.json` being deleted, so its own references don't count.
+// This is what keeps version deletion from removing an image another version
+// still points at (the bug that left the Sarah story with 5 broken images).
+export async function collectReferencedMediaKeys(env: Env, excludeVersionKey: string): Promise<Set<string>> {
+  const set = new Set<string>();
+  const all = await env.STORIES.list({ limit: 1000 });
+  const versionKeys = all.objects
+    .map((o) => o.key)
+    .filter((k) => /\/v\d+\.json$/.test(k) && k !== excludeVersionKey);
+  await Promise.all(versionKeys.map(async (k) => {
+    const blob = await env.STORIES.get(k);
+    if (!blob) return;
+    try {
+      const v = (await blob.json()) as StoryVersion;
+      for (const p of v.paragraphs ?? []) {
+        const ik = mediaKeyFromUrl(p.image_url);
+        if (ik) set.add(ik);
+      }
+      const nk = mediaKeyFromUrl(v.narration_url);
+      if (nk) set.add(nk);
+    } catch { /* ignore unparseable blob */ }
+  }));
+  return set;
+}
+
 export async function deleteOneStoryVersion(env: Env, id: string, version: number): Promise<DeleteVersionResult> {
   const versionKey = `${id}/v${version}.json`;
   const existing = await env.STORIES.get(versionKey);
@@ -204,14 +238,16 @@ export async function deleteOneStoryVersion(env: Env, id: string, version: numbe
     throw new Error(`version ${version} not found for story ${id}`);
   }
 
-  // Delete the version blob and its media (prefix is `{id}-v{n}-` for
-  // paragraph images plus the exact `{id}-v{n}.mp3` for narration).
-  // R2 delete is idempotent — missing keys no-op.
+  // Delete the version blob, then delete its media — but only media that no
+  // surviving version still references. Unchanged paragraphs across versions
+  // share one image key, so a blind prefix delete would orphan live images.
   await env.STORIES.delete(versionKey);
-  const mediaPrefixed = await env.MEDIA.list({ prefix: `${id}-v${version}-`, limit: 1000 });
-  await Promise.all(mediaPrefixed.objects.map((o) => env.MEDIA.delete(o.key)));
-  await env.MEDIA.delete(`${id}-v${version}.mp3`);
-  const mediaDeleted = mediaPrefixed.objects.length + 1;
+  const referenced = await collectReferencedMediaKeys(env, versionKey);
+  const candidateMedia = (await env.MEDIA.list({ prefix: `${id}-v${version}-`, limit: 1000 })).objects.map((o) => o.key);
+  candidateMedia.push(`${id}-v${version}.mp3`);
+  const toDelete = candidateMedia.filter((k) => !referenced.has(k));
+  await Promise.all(toDelete.map((k) => env.MEDIA.delete(k)));
+  const mediaDeleted = toDelete.length;
 
   // Find remaining versions to decide what to do with the index.
   const remaining = await env.STORIES.list({ prefix: `${id}/v`, limit: 1000 });
@@ -224,11 +260,15 @@ export async function deleteOneStoryVersion(env: Env, id: string, version: numbe
     .sort((a, b) => a - b);
 
   if (versionNumbers.length === 0) {
-    // No versions left — drop the index too. Any orphaned media will
-    // be swept by deleteStoryAndMedia's prefix delete.
+    // No versions left — drop the index too, and sweep this story's remaining
+    // media, but still spare anything another story (e.g. a translation) points
+    // at so we don't break a surviving version elsewhere.
     await env.STORIES.delete(`${id}/index.json`);
-    const orphan = await deleteStoryAndMedia(env, id);
-    return { removedStory: true, mediaDeleted: mediaDeleted + orphan.media };
+    const stillReferenced = await collectReferencedMediaKeys(env, versionKey);
+    const remainingMedia = (await env.MEDIA.list({ prefix: `${id}-`, limit: 1000 })).objects.map((o) => o.key);
+    const orphans = remainingMedia.filter((k) => !stillReferenced.has(k));
+    await Promise.all(orphans.map((k) => env.MEDIA.delete(k)));
+    return { removedStory: true, mediaDeleted: mediaDeleted + orphans.length };
   }
 
   const highest = versionNumbers[versionNumbers.length - 1];

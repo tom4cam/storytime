@@ -2,11 +2,12 @@
 // background work and updateStory's background work.
 
 import type { Env } from './env';
-import { generateStory, regenerateImagePrompt, regenerateParagraphText } from './anthropic';
+import { generateStory, regenerateImagePrompt, regenerateParagraphText, translateStory as runTranslation } from './anthropic';
 import { synthesize } from './tts';
 import { generateImage } from './fal';
 import { moderate } from './moderation';
-import { saveStoryVersion, storeMedia } from './storage';
+import { getStoryVersion, listStoryIndexes, saveStoryVersion, storeMedia } from './storage';
+import { isOverMonthlyCap } from './costs';
 import { notifyAdminFailure } from './alerts';
 import type { GeneratedStory, Lang, Paragraph, StoryAnswer, StoryVersion } from './types';
 import { charsToWords } from './words';
@@ -210,6 +211,63 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
   };
   await saveStoryVersion(env, version);
   return version;
+}
+
+// After an owner edits a story, bring its sibling translations (same group_id,
+// other languages) back in sync: re-translate the edited text into each
+// sibling's language and rebuild that sibling in place, reusing the edited
+// story's (new) images and re-synthesizing narration in the sibling language.
+// Best-effort and side-effecting — intended to run in ctx.waitUntil so the
+// edit response is not blocked. Failures for one sibling don't abort others.
+export async function propagateEditToTranslations(env: Env, edited: StoryVersion): Promise<void> {
+  const groupId = edited.group_id;
+  if (!groupId) return;
+  if (await isOverMonthlyCap(env)) return;
+
+  let indexes;
+  try { indexes = await listStoryIndexes(env); }
+  catch (e) { console.error('propagate: listStoryIndexes failed', e); return; }
+
+  const siblings = indexes.filter((idx) => idx.group_id === groupId && idx.id !== edited.id && idx.language !== edited.language);
+  for (const s of siblings) {
+    try {
+      const member = await getStoryVersion(env, s.id, s.latest_version);
+      if (!member) continue;
+      const translated = await runTranslation(env, {
+        title: edited.title,
+        paragraphs: edited.paragraphs.map((p) => p.text),
+        sourceLanguage: edited.language,
+      }, s.language);
+      if (translated.paragraphs.length !== edited.paragraphs.length) {
+        console.error(`propagate: paragraph count mismatch for ${s.id}`);
+        continue;
+      }
+      await buildAndSaveVersion(env, {
+        id: s.id,
+        version: s.latest_version,
+        title: translated.title,
+        sourceAnswers: member.source_answers ?? [],
+        language: s.language,
+        voiceId: member.voice_id,
+        creator_id: member.creator_id,
+        listed: member.listed,
+        group_id: groupId,
+        rhyme: member.rhyme,
+        series_id: member.series_id,
+        series_position: member.series_position,
+        // Reuse the edited story's images (translations share image keys) and
+        // its prompts; only the text is translated and narration re-synthesized.
+        paragraphs: edited.paragraphs.map((p, i) => ({
+          text: translated.paragraphs[i],
+          image_prompt: p.image_prompt,
+          image_url: p.image_url,
+        })),
+      });
+      console.log(`propagate: synced translation ${s.id} (${s.language})`);
+    } catch (e) {
+      console.error(`propagate: failed for ${s.id} (${s.language})`, e);
+    }
+  }
 }
 
 export async function buildFromAnswers(

@@ -575,7 +575,10 @@ function renderParagraph(
 
   return wordsForPara.map((w, localIdx) => {
     const flatIdx = flatIndexes[localIdx];
-    const isCurrent = flatIdx === activeIndex && activeIndex >= 0;
+    // Highlight a sliding 3-word window (previous, current, next) rather than a
+    // single word, so small alignment errors feel less jarring and following
+    // along is easier.
+    const isCurrent = activeIndex >= 0 && flatIdx >= activeIndex - 1 && flatIdx <= activeIndex + 1;
     return (
       <span key={`${w.paragraphIndex}-${w.wordIndex}`}>
         <button

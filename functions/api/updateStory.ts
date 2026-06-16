@@ -3,7 +3,7 @@
 // Non-owners: writes a new "generating" version stub, builds, returns the new version.
 
 import type { Env } from './_lib/env';
-import { buildAndSaveVersion, saveFailedVersion, saveGeneratingStub } from './_lib/build';
+import { buildAndSaveVersion, propagateEditToTranslations, saveFailedVersion, saveGeneratingStub } from './_lib/build';
 import { CAP_REACHED_MESSAGE, isOverMonthlyCap } from './_lib/costs';
 import { getStoryIndex, getStoryVersion } from './_lib/storage';
 import { readCreatorId } from './_lib/creatorId';
@@ -24,7 +24,7 @@ interface UpdateStoryRequest {
   }[];
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   let body: UpdateStoryRequest;
   try { body = (await request.json()) as UpdateStoryRequest; }
   catch (e) { return badRequest((e as Error).message || 'Bad JSON'); }
@@ -88,6 +88,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       group_id: previous.group_id,
       rhyme: previous.rhyme,
     });
+    // Owner edits are authoritative, so bring sibling translations back in
+    // sync in the background (re-translate + re-narrate). Non-owner edits make
+    // a new version of someone else's story and must not rewrite their group.
+    if (isOwner && previous.group_id) {
+      waitUntil(
+        propagateEditToTranslations(env, story).catch((e) =>
+          console.error('propagateEditToTranslations failed', e)),
+      );
+    }
     return json(toPublicStory(story, cookieId), 200);
   } catch (e) {
     console.error('update build failed', e);
