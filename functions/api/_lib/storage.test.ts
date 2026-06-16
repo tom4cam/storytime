@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { groupStoryIndexes } from './storage';
+import { collectReferencedMediaKeys, groupStoryIndexes } from './storage';
+import type { Env } from './env';
 import type { StoryIndex } from './types';
 
 function idx(overrides: Partial<StoryIndex> & Pick<StoryIndex, 'id' | 'language'>): StoryIndex {
@@ -78,5 +79,61 @@ describe('groupStoryIndexes', () => {
     const recent = idx({ id: 'recent', language: 'en', updated_at: '2026-05-01T00:00:00Z' });
     const result = groupStoryIndexes([old, recent], 'en');
     expect(result.map((g) => g.primary.id)).toEqual(['recent', 'old']);
+  });
+});
+
+// Minimal in-memory STORIES bucket exposing just list()/get().
+function memStories(blobs: Record<string, unknown>) {
+  return {
+    async list({ prefix }: { prefix?: string } = {}) {
+      const keys = Object.keys(blobs).filter((k) => !prefix || k.startsWith(prefix));
+      return { objects: keys.map((key) => ({ key })) };
+    },
+    async get(key: string) {
+      if (!(key in blobs)) return null;
+      const val = blobs[key];
+      return { async json() { return val; } };
+    },
+  };
+}
+
+describe('collectReferencedMediaKeys', () => {
+  it('collects image + narration keys from surviving versions and excludes the deleted one', async () => {
+    const blobs = {
+      // v1 owns its images; v2 reuses v1-p1 (unchanged paragraph) but
+      // regenerated p2 to its own key. A translation (story b) reuses a-v1-p1.
+      'a/v1.json': {
+        paragraphs: [
+          { image_url: '/api/media?key=a-v1-p1.png&v=x' },
+          { image_url: '/api/media?key=a-v1-p2.png' },
+        ],
+        narration_url: '/api/media?key=a-v1.mp3',
+      },
+      'a/v2.json': {
+        paragraphs: [
+          { image_url: '/api/media?key=a-v1-p1.png&v=x' },
+          { image_url: '/api/media?key=a-v2-p2.png' },
+        ],
+        narration_url: '/api/media?key=a-v2.mp3',
+      },
+      'a/index.json': { not: 'a version blob' },
+      'b/v1.json': {
+        paragraphs: [{ image_url: '/api/media?key=a-v1-p1.png' }],
+        narration_url: '/api/media?key=b-v1.mp3',
+      },
+    };
+    const env = { STORIES: memStories(blobs) } as unknown as Env;
+
+    // Deleting a/v2: surviving versions are a/v1 and b/v1.
+    const refs = await collectReferencedMediaKeys(env, 'a/v2.json');
+
+    // Shared / still-referenced keys are preserved.
+    expect(refs.has('a-v1-p1.png')).toBe(true);
+    expect(refs.has('a-v1-p2.png')).toBe(true);
+    expect(refs.has('a-v1.mp3')).toBe(true);
+    expect(refs.has('b-v1.mp3')).toBe(true);
+    // Keys only the deleted version referenced are NOT protected.
+    expect(refs.has('a-v2-p2.png')).toBe(false);
+    expect(refs.has('a-v2.mp3')).toBe(false);
   });
 });
