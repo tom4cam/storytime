@@ -1,4 +1,4 @@
-import { getAdminToken } from './adminToken';
+import { clearAdminToken, getAdminToken } from './adminToken';
 import type { Lang, StoryAnswer, StoryGroupSummary, StoryVersion, StoryVersionWithSiblings } from './types';
 
 const FN_BASE = '/api';
@@ -131,6 +131,9 @@ export async function deleteStoryVersion(id: string, version: number): Promise<D
     headers: { 'Content-Type': 'application/json', ...adminHeaders() },
     body: JSON.stringify({ id, version }),
   });
+  // A 403 here means the stored admin token is missing/stale (e.g. rotated).
+  // Drop it so the next attempt prompts a fresh sign-in instead of resending.
+  if (res.status === 403) clearAdminToken();
   return jsonOrThrow<DeleteVersionResponse>(res);
 }
 
