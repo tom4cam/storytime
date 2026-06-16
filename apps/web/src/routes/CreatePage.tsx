@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { MicInput } from '../components/MicInput';
@@ -59,7 +59,8 @@ type StepKind = 'lang' | 'opener' | 'voice' | 'rhyme' | 'q';
 export function CreatePage() {
   const t = useT();
   const { lang: uiLang } = useLang();
-  const [prefs] = usePrefs();
+  const [prefs, setPrefs] = usePrefs();
+  const readAloud = prefs.readAloud;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -87,8 +88,6 @@ export function CreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [simplerOn, setSimplerOn] = useState<Record<string, boolean>>({});
   const [helping, setHelping] = useState<string | null>(null);
-  const spokenForKeyRef = useRef<string>('');
-
   const q = QUESTIONS[qIndex];
   const totalDone = Object.keys(answers).length;
   const minDone = QUESTIONS.filter((x) => x.required).length;
@@ -96,36 +95,53 @@ export function CreatePage() {
   const isLastQuestion = qIndex >= QUESTIONS.length - 1;
   const voiceMeta = findVoiceByKey(voiceKey) ?? defaultVoiceFor(storyLang ?? uiLang);
 
-  const speakKey = (key: StringKey) => {
-    if (!storyLang) return;
-    const text = t(key);
+  const speak = (text: string) => {
+    if (!text.trim()) return;
+    // The language step runs before storyLang is chosen — read in the UI
+    // language so the picker itself can still be read aloud.
     void speakBest(text, {
-      language: storyLang,
+      language: storyLang ?? uiLang,
       voiceId: voiceMeta.voiceId,
       speed: prefs.slow ? 0.75 : undefined,
     });
   };
 
-  // Speak whenever the spoken prompt for this step changes.
-  useEffect(() => {
-    if (!storyLang) return;
-    let spokenKey: StringKey | null = null;
-    let stepId = '';
-    if (stepKind === 'opener') { spokenKey = 'opener.spoken'; stepId = 'opener'; }
-    else if (stepKind === 'voice') { spokenKey = 'voice.stepTitle'; stepId = 'voice'; }
-    else if (stepKind === 'q' && q) {
-      spokenKey = (simplerOn[q.id] && QUESTION_HELPERS[q.id]?.simplerKey) || q.spokenKey;
-      stepId = `q-${q.id}-${simplerOn[q.id] ? 'simpler' : 'normal'}`;
-    }
-    if (spokenKey && spokenForKeyRef.current !== stepId) {
-      spokenForKeyRef.current = stepId;
-      speakKey(spokenKey);
-    }
-    return () => { cancelSpeech(); stopAskVoice(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepKind, qIndex, storyLang, simplerOn, voiceKey, prefs.slow]);
+  const speakKey = (key: StringKey) => speak(t(key));
 
-  useEffect(() => () => { cancelSpeech(); stopAskVoice(); }, []);
+  // Read-aloud mode: when on, tapping any label/title/option speaks it. We
+  // listen in the capture phase but never preventDefault, so the element's own
+  // click still runs — options are read AND selected in a single tap.
+  const handleReadClick = (e: ReactMouseEvent) => {
+    if (!readAloud) return;
+    const target = e.target as HTMLElement;
+    // Don't hijack typing or the speaker toggle / explicit "hear again" buttons.
+    if (target.closest('input, textarea, [data-no-speak]')) return;
+    const el = target.closest<HTMLElement>('button, a, label, .question, .chip');
+    if (!el) return;
+    const text = (el.getAttribute('data-speak') ?? el.textContent ?? '').trim();
+    if (text) speak(text);
+  };
+
+  const speakerToggle = (
+    <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 4 }}>
+      <button
+        type="button"
+        data-no-speak
+        className={`btn ghost speaker-toggle${readAloud ? ' on' : ''}`}
+        aria-pressed={readAloud}
+        aria-label={readAloud ? t('create.readAloudOn') : t('create.readAloudOff')}
+        title={readAloud ? t('create.readAloudOn') : t('create.readAloudOff')}
+        onClick={() => setPrefs({ readAloud: !readAloud })}
+      >
+        <span aria-hidden="true">{readAloud ? '🔊' : '🔇'}</span> {t('create.readAloud')}
+      </button>
+    </div>
+  );
+
+  // Stop any in-progress speech when the step changes or the page unmounts.
+  useEffect(() => {
+    return () => { cancelSpeech(); stopAskVoice(); };
+  }, [stepKind, qIndex, simplerOn]);
 
   const seriesBanner = seriesParam && (
     <div className="series-badge" style={{ display: 'block', marginBottom: 16 }}>
@@ -140,7 +156,8 @@ export function CreatePage() {
     return (
       <Layout>
         {seriesBanner}
-        <div className="card">
+        <div className="card" onClickCapture={handleReadClick}>
+          {speakerToggle}
           <div className="question">{t('create.langStepTitle')}</div>
           <div className="lang-grid" style={{ marginTop: 16 }}>
             {LANGS.map((code) => (
@@ -199,7 +216,8 @@ export function CreatePage() {
     if (modRedirect) {
       return (
         <Layout>
-          <div className="card">
+          <div className="card" onClickCapture={handleReadClick}>
+            {speakerToggle}
             <div className="question">{t('mod.redirectTitle')}</div>
             <p>{t('mod.redirectBody')}</p>
             <div className="chip-grid">
@@ -216,9 +234,10 @@ export function CreatePage() {
 
     return (
       <Layout>
-        <div className="card">
+        <div className="card" onClickCapture={handleReadClick}>
+          {speakerToggle}
           <div className="question">{t('opener.title')}</div>
-          <button type="button" className="btn ghost" onClick={() => speakKey('opener.spoken')}>
+          <button type="button" data-no-speak className="btn ghost" onClick={() => speakKey('opener.spoken')}>
             {t('create.hearAgain')}
           </button>
           <div className="chip-grid">
@@ -259,9 +278,10 @@ export function CreatePage() {
   if (stepKind === 'voice') {
     return (
       <Layout>
-        <div className="card">
+        <div className="card" onClickCapture={handleReadClick}>
+          {speakerToggle}
           <div className="question">{t('voice.stepTitle')}</div>
-          <button type="button" className="btn ghost" onClick={() => speakKey('voice.stepTitle')}>
+          <button type="button" data-no-speak className="btn ghost" onClick={() => speakKey('voice.stepTitle')}>
             {t('create.hearAgain')}
           </button>
           <div style={{ marginTop: 16 }}>
@@ -286,7 +306,8 @@ export function CreatePage() {
   if (stepKind === 'rhyme') {
     return (
       <Layout showExit>
-        <div className="card">
+        <div className="card" onClickCapture={handleReadClick}>
+          {speakerToggle}
           <div className="question">{t('rhyme.stepTitle')}</div>
           <div className="row" style={{ justifyContent: 'center', gap: 16, marginTop: 16 }}>
             <button type="button" className="btn sun" onClick={() => { setRhyme(true); setStepKind('q'); setQIndex(0); }}>
@@ -386,13 +407,14 @@ export function CreatePage() {
       <div className="progress" aria-hidden="true">
         <div style={{ width: `${progressPct}%` }} />
       </div>
-      <div className="card">
+      <div className="card" onClickCapture={handleReadClick}>
+        {speakerToggle}
         <div className="question">{t(displayPromptKey)}</div>
         <p className="subtle">
           {q.required ? t('create.required') : t('create.optional')}
         </p>
         <div className="helper-row">
-          <button type="button" className="btn ghost" onClick={() => speakKey(displayPromptKey)}>
+          <button type="button" data-no-speak className="btn ghost" onClick={() => speakKey(displayPromptKey)}>
             {t('create.hearAgain')}
           </button>
           {helpers?.simplerKey && (

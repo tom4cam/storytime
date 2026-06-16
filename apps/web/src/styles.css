@@ -857,6 +857,10 @@ ul.answer-list li b { color: var(--ink-soft); }
 }
 .star-clear:hover { color: var(--accent-deep); }
 
+/* Read-aloud speaker toggle in the create flow */
+.speaker-toggle { font-size: 15px; min-height: 40px; padding: 6px 14px; touch-action: manipulation; }
+.speaker-toggle.on { background: var(--sun); border-color: var(--ink); color: var(--ink); font-weight: 800; }
+
 .tile-stars {
   display: block;
   color: var(--sun);

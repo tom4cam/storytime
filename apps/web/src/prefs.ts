@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react';
 
 export interface Prefs {
   slow: boolean;
+  // When true, the create flow reads aloud whatever the user taps (title,
+  // options, buttons). Off by default so the wizard is silent until the
+  // user turns the speaker on; persisted so it survives reloads/visits.
+  readAloud: boolean;
 }
 
 const KEY = 'storyMaker.prefs';
-const DEFAULT: Prefs = { slow: false };
+const DEFAULT: Prefs = { slow: false, readAloud: false };
 
 function read(): Prefs {
   if (typeof window === 'undefined') return DEFAULT;
