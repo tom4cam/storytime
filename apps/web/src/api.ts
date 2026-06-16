@@ -74,7 +74,14 @@ export async function setStars(id: string, stars: number | null): Promise<{ ok: 
 
 export async function updateStory(
   id: string,
-  paragraphs: { text: string; image_url: string | null; image_prompt?: string; regenerate_image?: boolean }[],
+  paragraphs: {
+    text: string;
+    image_url: string | null;
+    image_prompt?: string;
+    regenerate_image?: boolean;
+    regenerate_text?: boolean;
+    change_instruction?: string;
+  }[],
   title: string,
   summary: string
 ): Promise<StoryVersion> {

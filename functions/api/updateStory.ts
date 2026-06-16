@@ -14,7 +14,14 @@ interface UpdateStoryRequest {
   id: string;
   title: string;
   summary?: string;
-  paragraphs: { text: string; image_url: string | null; image_prompt?: string; regenerate_image?: boolean }[];
+  paragraphs: {
+    text: string;
+    image_url: string | null;
+    image_prompt?: string;
+    regenerate_image?: boolean;
+    regenerate_text?: boolean;
+    change_instruction?: string;
+  }[];
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -61,6 +68,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     image_url: p.image_url ?? null,
     image_prompt: p.image_prompt,
     regenerate_image: !!p.regenerate_image,
+    regenerate_text: !!p.regenerate_text,
+    change_instruction: typeof p.change_instruction === 'string' ? p.change_instruction : undefined,
   }));
   const sourceAnswers = previous.source_answers ?? [];
 

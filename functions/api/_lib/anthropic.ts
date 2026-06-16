@@ -93,10 +93,20 @@ export async function generateStory(env: Env, answers: StoryAnswer[], language: 
   return parsed;
 }
 
-export async function regenerateImagePrompt(env: Env, paragraphText: string, storyTitle: string): Promise<string> {
+export async function regenerateImagePrompt(
+  env: Env,
+  paragraphText: string,
+  storyTitle: string,
+  instruction?: string,
+): Promise<string> {
   const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
   const client = new Anthropic({ apiKey });
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  // An optional user instruction (e.g. "give him blond medium-long hair") is
+  // woven into the scene so the regenerated image reflects the requested change.
+  const changeLine = instruction && instruction.trim()
+    ? `\n\nIncorporate this change in the scene: ${instruction.trim()}`
+    : '';
   let response: Awaited<ReturnType<typeof client.messages.create>>;
   try {
     response = await client.messages.create({
@@ -104,7 +114,7 @@ export async function regenerateImagePrompt(env: Env, paragraphText: string, sto
       max_tokens: 200,
       system: 'Return one short sentence describing the scene for a cartoon illustrator. Bright colors, friendly faces, cartoon style, no text in the image. Around 20 words. No quotes, no prefix.',
       messages: [
-        { role: 'user', content: `Story title: ${storyTitle}\n\nParagraph:\n${paragraphText}\n\nWrite the image prompt only.` },
+        { role: 'user', content: `Story title: ${storyTitle}\n\nParagraph:\n${paragraphText}${changeLine}\n\nWrite the image prompt only.` },
       ],
     });
   } catch (e) {
@@ -114,6 +124,44 @@ export async function regenerateImagePrompt(env: Env, paragraphText: string, sto
   const block = response.content.find((b) => b.type === 'text');
   if (!block || block.type !== 'text') return paragraphText.slice(0, 200);
   return block.text.trim().replace(/^"|"$/g, '');
+}
+
+// Rewrite a single paragraph during an edit. With an instruction it applies
+// that specific change ("make him braver", "add a puppy"); without one it
+// rephrases the same events with fresh wording. Returns plain text.
+export async function regenerateParagraphText(
+  env: Env,
+  opts: { originalText: string; instruction?: string; storyTitle: string; language: Lang; rhyme?: boolean },
+): Promise<string> {
+  const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
+  const client = new Anthropic({ apiKey });
+  const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const langName = LANG_NAMES[opts.language];
+  const styleRule = opts.rhyme
+    ? 'Write it as a short rhyming verse in simple AABB couplets.'
+    : 'Write clear, warm prose.';
+  const change = opts.instruction && opts.instruction.trim()
+    ? `Apply this change: ${opts.instruction.trim()}`
+    : 'Rewrite it with fresh wording while keeping the same meaning and events.';
+  let response: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    response = await client.messages.create({
+      model,
+      max_tokens: 600,
+      system: `You are a warm storyteller for kids ages 5 to 9. Rewrite a single paragraph of a story. G rated only: no violence, no real fear, no romance, no mean characters. Use simple words. Keep it to 2 to 4 short sentences, about the same length as the original. Keep any character names unchanged. Write in ${langName}. ${styleRule} Do not use hyphens, em dashes, or emojis. Return only the rewritten paragraph text, with no quotes, no prefix, and no JSON.`,
+      messages: [
+        { role: 'user', content: `Story title: ${opts.storyTitle}\n\nOriginal paragraph:\n${opts.originalText}\n\n${change}\n\nReturn only the new paragraph text.` },
+      ],
+    });
+  } catch (e) {
+    await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
+    throw e;
+  }
+  const block = response.content.find((b) => b.type === 'text');
+  if (!block || block.type !== 'text') return opts.originalText;
+  const text = block.text.trim().replace(/^"|"$/g, '');
+  void recordCost(env, 'anthropic', 'story_gen', 0.005);
+  return text || opts.originalText;
 }
 
 export interface TranslatedStoryPayload {

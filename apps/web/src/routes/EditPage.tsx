@@ -8,6 +8,8 @@ import { imageAlt } from '../imageAlt';
 
 interface DraftParagraph extends Paragraph {
   regenerate_image?: boolean;
+  regenerate_text?: boolean;
+  change_instruction?: string;
 }
 
 export function EditPage() {
@@ -54,6 +56,8 @@ export function EditPage() {
           image_url: p.regenerate_image ? null : p.image_url,
           image_prompt: p.image_prompt,
           regenerate_image: !!p.regenerate_image,
+          regenerate_text: !!p.regenerate_text,
+          change_instruction: p.change_instruction?.trim() || undefined,
         })),
         title,
         summary
@@ -117,7 +121,7 @@ export function EditPage() {
             onChange={(e) => updateParagraph(i, { text: e.target.value })}
             aria-label={t('edit.paragraphLabel', { n: String(i + 1) })}
           />
-          <div className="row" style={{ marginTop: 12 }}>
+          <div className="row" style={{ marginTop: 12, gap: 16, flexWrap: 'wrap' }}>
             <label className="row" style={{ gap: 8 }}>
               <input
                 type="checkbox"
@@ -126,6 +130,26 @@ export function EditPage() {
               />
               {t('edit.regenerateImage')}
             </label>
+            <label className="row" style={{ gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={!!p.regenerate_text}
+                onChange={(e) => updateParagraph(i, { regenerate_text: e.target.checked })}
+              />
+              {t('edit.regenerateText')}
+            </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <label htmlFor={`change-${i}`} className="subtle" style={{ display: 'block', marginBottom: 4 }}>
+              {t('edit.changeLabel')}
+            </label>
+            <input
+              id={`change-${i}`}
+              type="text"
+              value={p.change_instruction ?? ''}
+              placeholder={t('edit.changePlaceholder')}
+              onChange={(e) => updateParagraph(i, { change_instruction: e.target.value })}
+            />
           </div>
           {p.image_url && !p.regenerate_image && (
             <div style={{ marginTop: 12 }}>

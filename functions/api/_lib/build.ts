@@ -2,7 +2,7 @@
 // background work and updateStory's background work.
 
 import type { Env } from './env';
-import { generateStory, regenerateImagePrompt } from './anthropic';
+import { generateStory, regenerateImagePrompt, regenerateParagraphText } from './anthropic';
 import { synthesize } from './tts';
 import { generateImage } from './fal';
 import { moderate } from './moderation';
@@ -113,14 +113,41 @@ interface BuildOptions {
   rhyme?: boolean;
   series_id?: string;
   series_position?: number;
-  paragraphs: { text: string; image_prompt?: string; image_url: string | null; regenerate_image?: boolean }[];
+  paragraphs: {
+    text: string;
+    image_prompt?: string;
+    image_url: string | null;
+    regenerate_image?: boolean;
+    regenerate_text?: boolean;
+    change_instruction?: string;
+  }[];
 }
 
 export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise<StoryVersion> {
   const id = opts.id ?? crypto.randomUUID();
   const title = opts.title?.trim() || 'A Brand New Story';
 
-  const paragraphTexts = opts.paragraphs.map((p) => p.text);
+  // Phase 1: resolve final paragraph text. Paragraphs flagged for text
+  // regeneration are rewritten first (optionally applying the user's change
+  // instruction) so the narration and any regenerated image reflect the new
+  // wording. Batched to respect the LLM/concurrency budget.
+  const finalTexts: string[] = new Array(opts.paragraphs.length);
+  for (let start = 0; start < opts.paragraphs.length; start += FAL_CONCURRENCY) {
+    const slice = opts.paragraphs.slice(start, start + FAL_CONCURRENCY);
+    const rewritten = await Promise.all(slice.map(async (p) => {
+      if (!p.regenerate_text) return p.text;
+      return regenerateParagraphText(env, {
+        originalText: p.text,
+        instruction: p.change_instruction,
+        storyTitle: title,
+        language: opts.language,
+        rhyme: opts.rhyme,
+      });
+    }));
+    for (let j = 0; j < rewritten.length; j += 1) finalTexts[start + j] = rewritten[j];
+  }
+
+  const paragraphTexts = finalTexts;
   const narrationText = paragraphTexts.join('\n\n');
   const narrationTask = synthesize(env, narrationText, { voiceId: opts.voiceId }).then(async ({ audio, alignment }) => {
     const url = await storeMedia(env, `${id}-v${opts.version}.mp3`, audio, 'audio/mpeg');
@@ -134,20 +161,27 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
     const slice = opts.paragraphs.slice(start, start + FAL_CONCURRENCY);
     const results = await Promise.all(slice.map(async (p, j) => {
       const i = start + j;
+      const finalText = finalTexts[i];
       const needsImage = p.regenerate_image || !p.image_url;
       if (!needsImage) {
-        return { text: p.text, image_url: p.image_url, image_prompt: p.image_prompt } satisfies Paragraph;
+        return { text: finalText, image_url: p.image_url, image_prompt: p.image_prompt } satisfies Paragraph;
       }
-      const basePrompt = p.image_prompt && p.image_prompt.trim().length > 0
-        ? unwrapImagePrompt(p.image_prompt)
-        : await regenerateImagePrompt(env, p.text, title);
+      const instruction = p.change_instruction?.trim();
+      // Reuse the saved prompt only when nothing should change it. If the text
+      // was rewritten or the user gave a change instruction, derive a fresh
+      // prompt from the final text (weaving the instruction in) so the picture
+      // matches the new wording / requested change.
+      const reuseSaved = !p.regenerate_text && !instruction && !!p.image_prompt && p.image_prompt.trim().length > 0;
+      const basePrompt = reuseSaved
+        ? unwrapImagePrompt(p.image_prompt as string)
+        : await regenerateImagePrompt(env, finalText, title, instruction);
       const summary = opts.summary?.trim();
       const prompt = summary
         ? `Cartoon illustration. Characters: ${summary} Scene: ${basePrompt} Style: bright colors, friendly faces, cartoon style, no text in the image.`
         : basePrompt;
       const img = await generateImage(env, prompt);
       const url = await storeMedia(env, `${id}-v${opts.version}-p${i + 1}.png`, img.data, img.contentType);
-      return { text: p.text, image_url: url, image_prompt: basePrompt } satisfies Paragraph;
+      return { text: finalText, image_url: url, image_prompt: basePrompt } satisfies Paragraph;
     }));
     for (let j = 0; j < results.length; j += 1) paragraphs[start + j] = results[j];
   }
