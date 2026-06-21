@@ -265,14 +265,7 @@ export async function deleteOneStoryVersion(env: Env, id: string, version: numbe
   const mediaDeleted = toDelete.length;
 
   // Find remaining versions to decide what to do with the index.
-  const remaining = await env.STORIES.list({ prefix: `${id}/v`, limit: 1000 });
-  const versionNumbers = remaining.objects
-    .map((o) => {
-      const m = /\/v(\d+)\.json$/.exec(o.key);
-      return m ? parseInt(m[1], 10) : NaN;
-    })
-    .filter((n) => Number.isFinite(n))
-    .sort((a, b) => a - b);
+  const versionNumbers = await listStoryVersionNumbers(env, id);
 
   if (versionNumbers.length === 0) {
     // No versions left — drop the index too, and sweep this story's remaining

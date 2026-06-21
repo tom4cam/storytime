@@ -5,7 +5,7 @@
 
 import type { Env } from '../_lib/env';
 import { isAdminRequest } from '../_lib/adminAuth';
-import { getStoryIndex } from '../_lib/storage';
+import { getStoryIndex, listStoryVersionNumbers } from '../_lib/storage';
 import type { StoryVersion } from '../_lib/types';
 import { badRequest, json } from '../_lib/util';
 
@@ -34,14 +34,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const idx = await getStoryIndex(env, id);
   if (!idx) return badRequest('story not found');
 
-  const list = await env.STORIES.list({ prefix: `${id}/v`, limit: 1000 });
-  const versionNums = list.objects
-    .map((o) => {
-      const m = /\/v(\d+)\.json$/.exec(o.key);
-      return m ? parseInt(m[1], 10) : NaN;
-    })
-    .filter((n) => Number.isFinite(n))
-    .sort((a, b) => a - b);
+  const versionNums = await listStoryVersionNumbers(env, id);
 
   const versions: VersionSummary[] = await Promise.all(
     versionNums.map(async (v) => {
