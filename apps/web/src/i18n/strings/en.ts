@@ -5,7 +5,7 @@ export const en = {
   'dedication.line': "Made with love by Uncle Tom for Brennan and Linnéa's birthdays.",
 
   // Home page
-  'home.heroTitle': 'Make a story. Anything you want.',
+  'home.heroTitle': 'Make your own stories',
   'home.heroBody': 'Pick a hero, a place, a problem — we write, draw, and read it aloud, just for you.',
   'home.heroCta': 'Start a new story',
   'home.recentHeading': 'Recent stories',

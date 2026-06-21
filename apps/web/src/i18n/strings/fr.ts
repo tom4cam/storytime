@@ -2,7 +2,7 @@ export const fr = {
   "brand.name": "storytime",
   "brand.tagline": "Raconte une histoire. Écoute-la. Regarde-la.",
   "dedication.line": "Fait avec amour par Tonton Tom pour les anniversaires de Brennan et Linnéa.",
-  "home.heroTitle": "Invente une histoire. Comme tu veux.",
+  "home.heroTitle": "Crée tes propres histoires",
   "home.heroBody": "Choisis un héros, un lieu, un problème — on l'écrit, la dessine et la lit à voix haute, rien que pour toi.",
   "home.heroCta": "Commencer une nouvelle histoire",
   "home.recentHeading": "Histoires récentes",

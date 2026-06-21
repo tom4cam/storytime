@@ -2,7 +2,7 @@ export const it = {
   "brand.name": "storytime",
   "brand.tagline": "Racconta una storia. Ascoltala. Guardala.",
   "dedication.line": "Fatto con amore da Zio Tom per i compleanni di Brennan e Linnéa.",
-  "home.heroTitle": "Inventa una storia. Come vuoi tu.",
+  "home.heroTitle": "Crea le tue storie",
   "home.heroBody": "Scegli un eroe, un posto, un problema: la scriviamo, disegniamo e leggiamo ad alta voce, solo per te.",
   "home.heroCta": "Inizia una nuova storia",
   "home.recentHeading": "Storie recenti",

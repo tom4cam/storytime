@@ -7,7 +7,7 @@ export const sv: Record<StringKey, string> = {
   'dedication.line': 'Gjord med kärlek av farbror Tom till Brennans och Linnéas födelsedagar.',
 
   // Home page
-  'home.heroTitle': 'Skapa en saga. Vad du vill.',
+  'home.heroTitle': 'Skapa egna sagor',
   'home.heroBody': 'Välj en hjälte, en plats, ett problem – vi skriver, ritar och läser upp den, bara för dig.',
   'home.heroCta': 'Börja en ny saga',
   'home.recentHeading': 'Senaste sagorna',
