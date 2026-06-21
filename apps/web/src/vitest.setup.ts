@@ -1,8 +1,12 @@
-// Vitest setup: fix Node 25's broken built-in localStorage stub.
-// Node 25 exposes `globalThis.localStorage` when no --localstorage-file is
-// given, but its methods are missing or throw. jsdom tests need a real
-// in-memory Storage. We probe the implementation by actually calling it and
-// replace it (on both globalThis and window) when it misbehaves.
+// Vitest setup: install a deterministic in-memory Web Storage.
+//
+// Node 25 exposes a built-in `localStorage`/`sessionStorage` as a *configurable
+// accessor* that is non-functional unless launched with a valid
+// --localstorage-file (its methods are missing or throw), and it shadows
+// jsdom's own Storage. The accessor can also return inconsistent objects across
+// calls, so probing whether it "works" is unreliable. Rather than probe, we
+// replace it unconditionally on every run with a simple in-memory Storage.
+// setupFiles run once per test file, so each file gets a fresh store.
 
 function makeMemoryStorage(): Storage {
   const store = new Map<string, string>();
@@ -16,33 +20,25 @@ function makeMemoryStorage(): Storage {
   };
 }
 
-function storageBroken(s: unknown): boolean {
-  if (!s) return true;
-  const st = s as Storage;
+function installStorage(target: Record<string, unknown>, name: string): void {
   try {
-    if (typeof st.getItem !== 'function' || typeof st.setItem !== 'function'
-      || typeof st.removeItem !== 'function' || typeof st.clear !== 'function') return true;
-    st.setItem('__vitest_probe__', '1');
-    const ok = st.getItem('__vitest_probe__') === '1';
-    st.removeItem('__vitest_probe__');
-    return !ok;
+    Object.defineProperty(target, name, {
+      value: makeMemoryStorage(),
+      writable: true,
+      configurable: true,
+    });
   } catch {
-    return true;
+    // Non-configurable existing property — fall back to delete + assign.
+    try { delete target[name]; } catch { /* ignore */ }
+    target[name] = makeMemoryStorage();
   }
 }
 
-const targets: Array<Record<string, unknown>> = [globalThis as unknown as Record<string, unknown>];
+const g = globalThis as unknown as Record<string, unknown>;
 const w = (globalThis as { window?: unknown }).window;
-if (w && w !== globalThis) targets.push(w as Record<string, unknown>);
+const targets = w && w !== globalThis ? [g, w as Record<string, unknown>] : [g];
 
 for (const target of targets) {
-  for (const name of ['localStorage', 'sessionStorage'] as const) {
-    if (storageBroken(target[name])) {
-      Object.defineProperty(target, name, {
-        value: makeMemoryStorage(),
-        writable: true,
-        configurable: true,
-      });
-    }
-  }
+  installStorage(target, 'localStorage');
+  installStorage(target, 'sessionStorage');
 }
