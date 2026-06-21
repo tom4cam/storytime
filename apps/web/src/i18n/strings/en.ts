@@ -6,7 +6,7 @@ export const en = {
 
   // Home page
   'home.heroTitle': 'Make a story. Anything you want.',
-  'home.heroBody': 'Pick a hero, pick a place, pick a problem. The story maker will write it, draw it, and read it out loud just for you.',
+  'home.heroBody': 'Pick a hero, a place, a problem — we write, draw, and read it aloud, just for you.',
   'home.heroCta': 'Start a new story',
   'home.recentHeading': 'Recent stories',
   'home.recentLoading': 'Loading recent stories...',

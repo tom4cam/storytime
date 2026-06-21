@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { AudioBar, type AudioBarRef } from '../components/AudioBar';
@@ -32,36 +32,61 @@ export function StoryPage() {
   const audioRef = useRef<AudioBarRef | null>(null);
   const activeIndex = useAudioSync(audioRef, story?.narration_words);
   const lastScrolledParaRef = useRef<number>(-1);
-  // When the user clicks a word while audio is paused we play just that
-  // one word and auto-pause. This ref holds the disarm function so a
-  // follow-up click can cancel the pending pause before scheduling its own.
+  // When the user clicks story text we play just that one sentence and
+  // auto-pause at its end. This ref holds the disarm function so a follow-up
+  // click can cancel the pending pause before scheduling its own.
   const pendingPauseRef = useRef<(() => void) | null>(null);
+  // The sentence currently being read because the user tapped it — its words
+  // stay highlighted while it plays (and after it auto-pauses), instead of the
+  // sliding window used during full playback.
+  const [readingSentence, setReadingSentence] = useState<{ start: number; end: number } | null>(null);
+  // True only for the play() call a sentence-tap triggers, so the play-listener
+  // below doesn't immediately clear the sentence highlight we just set.
+  const clickInitiatedRef = useRef(false);
 
-  // Disarm any pending one-shot pause when the story changes or the
-  // page unmounts, otherwise a listener could fire against a stale audio
-  // element when the next story loads.
+  const sentences = useMemo(() => buildSentences(story?.narration_words), [story?.narration_words]);
+
+  // Disarm any pending one-shot pause (and drop the sentence highlight) when
+  // the story changes or the page unmounts, otherwise a listener could fire
+  // against a stale audio element when the next story loads.
   useEffect(() => {
     return () => {
       pendingPauseRef.current?.();
       pendingPauseRef.current = null;
+      setReadingSentence(null);
     };
   }, [story?.id, story?.version]);
 
-  const onWordClick = (w: WordTiming) => {
+  // When full playback starts from the audio bar (not a sentence tap), clear
+  // the tapped-sentence highlight so the sliding window can take over.
+  useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
-    // Whether playback should stop after this one word. "Auto-pause is
-    // already armed" counts as paused so rapid clicks behave consistently.
-    const wasPaused = el.paused || el.ended || pendingPauseRef.current !== null;
+    const onPlay = () => {
+      if (clickInitiatedRef.current) { clickInitiatedRef.current = false; return; }
+      setReadingSentence(null);
+    };
+    el.addEventListener('play', onPlay);
+    return () => el.removeEventListener('play', onPlay);
+  }, [story?.narration_url]);
+
+  const onWordClick = (w: WordTiming, flatIdx: number) => {
+    const el = audioRef.current;
+    if (!el) return;
     pendingPauseRef.current?.();
     pendingPauseRef.current = null;
-    el.currentTime = w.start;
-    // Words with degenerate timing (e.g. Whisper alignment failures stamped
-    // (0, 0)) have no usable duration. Falling into the auto-pause path
-    // would pause the audio instantly without playing anything, so for the
-    // paused case we just seek and let the user use the audio controls.
-    const usableDuration = w.end - w.start > 0.05;
-    if (wasPaused && usableDuration) {
+
+    // Read the whole sentence the tapped word belongs to, not just the word.
+    const sentence = sentences.find((s) => flatIdx >= s.start && flatIdx <= s.end);
+    const startT = sentence ? sentence.startTime : w.start;
+    const endT = sentence ? sentence.endTime : w.end;
+    setReadingSentence(sentence ? { start: sentence.start, end: sentence.end } : { start: flatIdx, end: flatIdx });
+
+    el.currentTime = startT;
+    // Degenerate timing (e.g. Whisper alignment stamped (0,0)) has no usable
+    // span; just seek and let the user drive with the audio controls.
+    const usableDuration = endT - startT > 0.05;
+    if (usableDuration) {
       let done = false;
       const finish = () => {
         if (done) return;
@@ -69,22 +94,23 @@ export function StoryPage() {
         el.removeEventListener('timeupdate', onTime);
         window.clearTimeout(timer);
         pendingPauseRef.current = null;
-        // Rewind to the word's start so pressing play resumes from this
-        // word, not from the moment of auto-pause (which sits at w.end).
-        try { el.currentTime = w.start; } catch { /* ignore */ }
+        clickInitiatedRef.current = false;
+        // Rewind to the sentence start so pressing play re-reads this sentence
+        // rather than resuming from the auto-pause point (which sits at its end).
+        try { el.currentTime = startT; } catch { /* ignore */ }
       };
       const onTime = () => {
-        if (el.currentTime >= w.end) { el.pause(); finish(); }
+        if (el.currentTime >= endT) { el.pause(); finish(); }
       };
-      // Fallback timer in case timeupdate stalls. ElevenLabs word
-      // durations are typically 150-400ms; a small buffer avoids
-      // clipping the trailing phoneme.
+      // Fallback timer in case timeupdate stalls, with a small buffer so the
+      // trailing phoneme isn't clipped.
       const rate = el.playbackRate || 1;
-      const ms = Math.max(50, ((w.end - w.start) * 1000) / rate) + 40;
+      const ms = Math.max(50, ((endT - startT) * 1000) / rate) + 80;
       const timer = window.setTimeout(() => { el.pause(); finish(); }, ms);
       el.addEventListener('timeupdate', onTime);
       pendingPauseRef.current = finish;
     }
+    clickInitiatedRef.current = true;
     void el.play();
   };
   const isOwner = !!story?.is_owner;
@@ -244,7 +270,11 @@ export function StoryPage() {
     );
   }
 
-  const versionLinks = Array.from({ length: story.version }, (_, i) => i + 1);
+  // Only the versions that still exist — a deleted earlier/middle version must
+  // not leave a dead link that 404s (or 400s on a re-delete attempt).
+  const versionLinks = story.available_versions && story.available_versions.length > 0
+    ? story.available_versions
+    : Array.from({ length: story.version }, (_, i) => i + 1);
   const words = story.narration_words;
 
   return (
@@ -343,7 +373,7 @@ export function StoryPage() {
               : <div className="placeholder">No picture for this part.</div>}
           </div>
           <div className="p-text">
-            {renderParagraph(p.text, i, words, activeIndex, onWordClick)}
+            {renderParagraph(p.text, i, words, activeIndex, readingSentence, onWordClick)}
           </div>
         </div>
       ))}
@@ -553,12 +583,41 @@ export function StoryPage() {
   );
 }
 
+interface Sentence {
+  start: number; // first flat word index (inclusive)
+  end: number;   // last flat word index (inclusive)
+  startTime: number;
+  endTime: number;
+}
+
+// Group the flat word list into sentences so a tap can read a whole sentence.
+// A sentence ends at sentence-final punctuation (optionally followed by a
+// closing quote/bracket) or at a paragraph boundary.
+function buildSentences(words: WordTiming[] | undefined): Sentence[] {
+  if (!words || words.length === 0) return [];
+  const endsSentence = (w: string) => /[.!?…。！？؟]['")\]»”’]?$/.test(w.trim());
+  const out: Sentence[] = [];
+  let start = 0;
+  for (let i = 0; i < words.length; i += 1) {
+    const isLast = i === words.length - 1;
+    const paraBreak = !isLast && words[i + 1].paragraphIndex !== words[i].paragraphIndex;
+    if (endsSentence(words[i].word) || paraBreak || isLast) {
+      let endTime = 0;
+      for (let k = start; k <= i; k += 1) endTime = Math.max(endTime, words[k].end);
+      out.push({ start, end: i, startTime: words[start].start, endTime });
+      start = i + 1;
+    }
+  }
+  return out;
+}
+
 function renderParagraph(
   text: string,
   paragraphIndex: number,
   words: WordTiming[] | undefined,
   activeIndex: number,
-  onWordClick: (w: WordTiming) => void,
+  readingSentence: { start: number; end: number } | null,
+  onWordClick: (w: WordTiming, flatIdx: number) => void,
 ) {
   if (!words || words.length === 0) {
     return text;
@@ -575,17 +634,19 @@ function renderParagraph(
 
   return wordsForPara.map((w, localIdx) => {
     const flatIdx = flatIndexes[localIdx];
-    // Highlight a sliding 3-word window (previous, current, next) rather than a
-    // single word, so small alignment errors feel less jarring and following
-    // along is easier.
-    const isCurrent = activeIndex >= 0 && flatIdx >= activeIndex - 1 && flatIdx <= activeIndex + 1;
+    // When a sentence was tapped, highlight that whole sentence. Otherwise
+    // highlight a sliding 3-word window (previous, current, next) during full
+    // playback, so small alignment errors feel less jarring.
+    const isCurrent = readingSentence
+      ? flatIdx >= readingSentence.start && flatIdx <= readingSentence.end
+      : activeIndex >= 0 && flatIdx >= activeIndex - 1 && flatIdx <= activeIndex + 1;
     return (
       <span key={`${w.paragraphIndex}-${w.wordIndex}`}>
         <button
           type="button"
           className={`word${isCurrent ? ' is-current' : ''}`}
           data-pw={`${w.paragraphIndex}-${w.wordIndex}`}
-          onClick={() => onWordClick(w)}
+          onClick={() => onWordClick(w, flatIdx)}
         >
           {w.word}
         </button>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { collectReferencedMediaKeys, groupStoryIndexes } from './storage';
+import { collectReferencedMediaKeys, groupStoryIndexes, listStoryVersionNumbers } from './storage';
 import type { Env } from './env';
 import type { StoryIndex } from './types';
 
@@ -135,5 +135,25 @@ describe('collectReferencedMediaKeys', () => {
     // Keys only the deleted version referenced are NOT protected.
     expect(refs.has('a-v2-p2.png')).toBe(false);
     expect(refs.has('a-v2.mp3')).toBe(false);
+  });
+});
+
+describe('listStoryVersionNumbers', () => {
+  it('returns only the versions that exist, ascending, after a gap', async () => {
+    // v1 was deleted; v2 and v3 remain. index.json must not be counted.
+    const blobs = {
+      'a/v2.json': { version: 2 },
+      'a/v3.json': { version: 3 },
+      'a/index.json': { latest_version: 3 },
+      'b/v1.json': { version: 1 }, // a different story — must be ignored
+    };
+    const env = { STORIES: memStories(blobs) } as unknown as Env;
+
+    expect(await listStoryVersionNumbers(env, 'a')).toEqual([2, 3]);
+  });
+
+  it('returns an empty array for a story with no versions', async () => {
+    const env = { STORIES: memStories({}) } as unknown as Env;
+    expect(await listStoryVersionNumbers(env, 'a')).toEqual([]);
   });
 });

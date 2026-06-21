@@ -64,6 +64,21 @@ export async function getStoryIndex(env: Env, id: string): Promise<StoryIndex | 
   return (await obj.json()) as StoryIndex;
 }
 
+// The version numbers that actually exist on disk for a story (ascending).
+// Used instead of assuming versions are a contiguous 1..latest range, which
+// breaks once an admin deletes a middle/earliest version: a stale link would
+// linger and re-deleting it 400s with "version N not found".
+export async function listStoryVersionNumbers(env: Env, id: string): Promise<number[]> {
+  const result = await env.STORIES.list({ prefix: `${id}/v`, limit: 1000 });
+  return result.objects
+    .map((o) => {
+      const m = /\/v(\d+)\.json$/.exec(o.key);
+      return m ? parseInt(m[1], 10) : NaN;
+    })
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+}
+
 export async function listStoryIndexes(env: Env): Promise<StoryIndex[]> {
   // R2 list is paginated; for a small app one page is plenty.
   const result = await env.STORIES.list({ limit: 1000 });

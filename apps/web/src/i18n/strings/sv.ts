@@ -8,7 +8,7 @@ export const sv: Record<StringKey, string> = {
 
   // Home page
   'home.heroTitle': 'Skapa en saga. Vad du vill.',
-  'home.heroBody': 'Välj en hjälte, välj en plats, välj ett problem. Sagomakaren skriver den, ritar den och läser den högt bara för dig.',
+  'home.heroBody': 'Välj en hjälte, en plats, ett problem – vi skriver, ritar och läser upp den, bara för dig.',
   'home.heroCta': 'Börja en ny saga',
   'home.recentHeading': 'Senaste sagorna',
   'home.recentLoading': 'Laddar senaste sagorna...',

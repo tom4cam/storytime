@@ -1,7 +1,7 @@
 // GET /api/getStory?id=...&version=...
 
 import type { Env } from './_lib/env';
-import { getStoryVersion, listStoryIndexes } from './_lib/storage';
+import { getStoryVersion, listStoryIndexes, listStoryVersionNumbers } from './_lib/storage';
 import { readCreatorId } from './_lib/creatorId';
 import { toPublicStory } from './_lib/publicStory';
 import type { Lang } from './_lib/types';
@@ -39,5 +39,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     series = { series_id: story.series_id, position: story.series_position, members };
   }
 
-  return json({ ...toPublicStory(story, readCreatorId(request)), siblings, series });
+  const available_versions = await listStoryVersionNumbers(env, id);
+
+  return json({ ...toPublicStory(story, readCreatorId(request)), siblings, series, available_versions });
 };

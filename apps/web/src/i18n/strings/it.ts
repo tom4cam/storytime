@@ -3,7 +3,7 @@ export const it = {
   "brand.tagline": "Racconta una storia. Ascoltala. Guardala.",
   "dedication.line": "Fatto con amore da Zio Tom per i compleanni di Brennan e Linnéa.",
   "home.heroTitle": "Inventa una storia. Come vuoi tu.",
-  "home.heroBody": "Scegli un eroe, scegli un posto, scegli un problema. Il creatore di storie la scriverà, la disegnerà e te la leggerà ad alta voce, solo per te.",
+  "home.heroBody": "Scegli un eroe, un posto, un problema: la scriviamo, disegniamo e leggiamo ad alta voce, solo per te.",
   "home.heroCta": "Inizia una nuova storia",
   "home.recentHeading": "Storie recenti",
   "home.recentLoading": "Caricamento delle storie recenti...",

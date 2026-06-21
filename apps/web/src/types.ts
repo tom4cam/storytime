@@ -96,4 +96,7 @@ export interface SeriesInfo {
 export interface StoryVersionWithSiblings extends StoryVersion {
   siblings: Array<{ id: string; language: Lang }>;
   series: SeriesInfo | null;
+  // Version numbers that actually exist (not necessarily a contiguous range —
+  // an admin may have deleted an earlier/middle version).
+  available_versions?: number[];
 }
