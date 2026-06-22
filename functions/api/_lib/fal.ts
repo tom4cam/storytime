@@ -3,6 +3,7 @@ import { requireEnv } from './env';
 import { classifyError, notifyAdminFailure } from './alerts';
 import { recordCost } from './costs';
 import { fetchWithRetry } from './retry';
+import { recordCall } from './telemetry';
 
 interface FalImageResponse {
   images: Array<{ url: string; content_type?: string }>;
@@ -39,11 +40,13 @@ export async function generateImage(
 
   let res: Response;
   try {
-    res = await fetchWithRetry(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }, { timeoutMs: 60_000 });
+    res = await recordCall(env, 'fal', 'image', () =>
+      fetchWithRetry(endpoint, {
+        method: 'POST',
+        headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, { timeoutMs: 60_000 })
+    );
   } catch (e) {
     await notifyAdminFailure(env, 'fal', 'network_error', (e as Error).message);
     throw e;

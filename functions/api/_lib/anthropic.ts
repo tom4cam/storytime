@@ -6,6 +6,7 @@ import type { GeneratedStory, Lang, StoryAnswer } from './types';
 import { requireEnv } from './env';
 import { notifyAdminFailure } from './alerts';
 import { recordCost } from './costs';
+import { recordCall } from './telemetry';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
@@ -70,17 +71,19 @@ export async function generateStory(
 
   let response: Awaited<ReturnType<typeof client.messages.create>>;
   try {
-    response = await client.messages.create({
-      model,
-      max_tokens: 3000,
-      system: STORY_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\n${rhymeInstruction}${sequelInstruction}\n\nReturn only the JSON object.`,
-        },
-      ],
-    });
+    response = await recordCall(env, 'anthropic', 'story_gen', () =>
+      client.messages.create({
+        model,
+        max_tokens: 3000,
+        system: STORY_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\n${rhymeInstruction}${sequelInstruction}\n\nReturn only the JSON object.`,
+          },
+        ],
+      })
+    );
   } catch (e) {
     await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
     throw e;
@@ -250,7 +253,7 @@ export async function translateStory(
 
   let res: Awaited<ReturnType<typeof client.messages.create>>;
   try {
-    res = await client.messages.create({
+    res = await recordCall(env, 'anthropic', 'translation', () => client.messages.create({
       model,
       // Generous cap so we never truncate mid tool-call. Non-Latin scripts
       // (Cyrillic, Devanagari, etc.) tokenize at multiple tokens per char,
@@ -277,7 +280,7 @@ export async function translateStory(
       ],
       tool_choice: { type: 'tool', name: 'submit_translation' },
       messages: [{ role: 'user', content: `Title: ${source.title}\n\n${body}` }],
-    });
+    }));
   } catch (e) {
     await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
     throw e;

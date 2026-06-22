@@ -22,6 +22,7 @@ import { requireEnv } from './env';
 import { classifyError, notifyAdminFailure } from './alerts';
 import { recordCost } from './costs';
 import { fetchWithRetry } from './retry';
+import { recordCall } from './telemetry';
 
 const OPENAI_TTS_DEFAULT_MODEL = 'tts-1';
 const OPENAI_STT_MODEL = 'whisper-1';
@@ -107,19 +108,21 @@ async function synthesizeWithElevenLabs(env: Env, text: string, opts: SynthOpts)
 
   let res: Response;
   try {
-    res = await fetchWithRetry(url, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': apiKey,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        text,
-        model_id: ELEVENLABS_TTS_MODEL,
-        output_format: 'mp3_44100_128',
-      }),
-    }, { attempts: 2 });
+    res = await recordCall(env, 'elevenlabs', 'tts', () =>
+      fetchWithRetry(url, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': apiKey,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: ELEVENLABS_TTS_MODEL,
+          output_format: 'mp3_44100_128',
+        }),
+      }, { attempts: 2 })
+    );
   } catch (e) {
     await notifyAdminFailure(env, 'elevenlabs', 'network_error', (e as Error).message);
     throw e;
@@ -152,18 +155,20 @@ async function synthesizeWithOpenAI(env: Env, text: string, opts: SynthOpts): Pr
 
   let ttsRes: Response;
   try {
-    ttsRes = await fetchWithRetry('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        voice,
-        input: text,
-        response_format: 'mp3',
-        ...(instructions ? { instructions } : {}),
-        ...(opts.speed != null ? { speed: opts.speed } : {}),
-      }),
-    });
+    ttsRes = await recordCall(env, 'openai', 'tts', () =>
+      fetchWithRetry('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          voice,
+          input: text,
+          response_format: 'mp3',
+          ...(instructions ? { instructions } : {}),
+          ...(opts.speed != null ? { speed: opts.speed } : {}),
+        }),
+      })
+    );
   } catch (e) {
     await notifyAdminFailure(env, 'openai', 'network_error', (e as Error).message);
     throw e;
@@ -187,11 +192,13 @@ async function synthesizeWithOpenAI(env: Env, text: string, opts: SynthOpts): Pr
 
   let whRes: Response;
   try {
-    whRes = await fetchWithRetry('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-    });
+    whRes = await recordCall(env, 'openai', 'whisper', () =>
+      fetchWithRetry('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+      })
+    );
   } catch (e) {
     await notifyAdminFailure(env, 'openai', 'network_error', (e as Error).message);
     throw e;
