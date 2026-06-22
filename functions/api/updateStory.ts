@@ -92,6 +92,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       group_id: previous.group_id,
       rhyme: previous.rhyme,
       character_bible: previous.character_bible,
+      previousParagraphs: previous.paragraphs,
     });
     // Owner edits are authoritative, so bring sibling translations back in sync
     // (re-translate + re-narrate). Run it synchronously within this request —

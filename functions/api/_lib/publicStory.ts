@@ -13,8 +13,15 @@ function ownerMatches(creatorId: string | undefined, requesterId: string | null)
 export type PublicStoryVersion = Omit<StoryVersion, 'creator_id'> & { is_owner: boolean };
 
 export function toPublicStory(story: StoryVersion, requesterId: string | null): PublicStoryVersion {
-  const { creator_id, ...rest } = story;
-  return { ...rest, is_owner: ownerMatches(creator_id, requesterId) };
+  const { creator_id, paragraphs, ...rest } = story;
+  // Drop per-paragraph audio cache fields — they're an internal server
+  // optimization for save-time audio reuse, and shipping the chars-level
+  // alignment to every story view would bloat the JSON for no UI win.
+  const publicParagraphs = paragraphs.map((p) => {
+    const { narration_url, narration_hash, narration_chars, ...rest } = p;
+    return rest;
+  });
+  return { ...rest, paragraphs: publicParagraphs, is_owner: ownerMatches(creator_id, requesterId) };
 }
 
 export type PublicStoryIndex = Omit<StoryIndex, 'creator_id'> & { is_mine: boolean };

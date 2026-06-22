@@ -3,14 +3,13 @@
 
 import type { Env } from './env';
 import { generateStory, regenerateImagePrompt, regenerateParagraphText, translateStory as runTranslation } from './anthropic';
-import { synthesize } from './tts';
+import { synthesizeStory } from './narration';
 import { generateImage } from './fal';
 import { moderate } from './moderation';
 import { getStoryVersion, listStoryIndexes, saveStoryVersion, storeMedia } from './storage';
 import { isOverMonthlyCap } from './costs';
 import { notifyAdminFailure } from './alerts';
 import type { GeneratedStory, Lang, Paragraph, StoryAnswer, StoryVersion } from './types';
-import { charsToWords } from './words';
 
 export class ModerationError extends Error {
   constructor(message: string) { super(message); this.name = 'ModerationError'; }
@@ -151,6 +150,9 @@ interface BuildOptions {
     regenerate_text?: boolean;
     change_instruction?: string;
   }[];
+  // Prior version's paragraphs, used by narration to reuse per-paragraph
+  // MP3s when text + voice are unchanged. Omit on first generation.
+  previousParagraphs?: Paragraph[];
 }
 
 export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise<StoryVersion> {
@@ -178,12 +180,22 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
   }
 
   const paragraphTexts = finalTexts;
-  const narrationText = paragraphTexts.join('\n\n');
-  const narrationTask = synthesize(env, narrationText, { voiceId: opts.voiceId }).then(async ({ audio, alignment }) => {
-    const url = await storeMedia(env, `${id}-v${opts.version}.mp3`, audio, 'audio/mpeg');
-    const words = charsToWords(paragraphTexts, alignment);
-    return { url, words };
-  });
+  // Per-paragraph synth + reuse: unchanged paragraphs (same text + voice as
+  // the prior version) reuse their saved MP3 + alignment instead of being
+  // re-synthesised. Concatenates into the full narration MP3 stored at the
+  // same key the player loads today.
+  const narrationTask = synthesizeStory(
+    env,
+    id,
+    opts.version,
+    paragraphTexts,
+    opts.voiceId,
+    opts.previousParagraphs,
+  ).then(({ narrationUrl, words, perParagraph }) => ({
+    url: narrationUrl,
+    words,
+    perParagraph,
+  }));
 
   // Image generation. Paragraph 1 is generated text-to-image (or reused
   // from a prior version); its image is then the kontext reference for
@@ -251,11 +263,24 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
 
   const narration = await narrationTask;
 
+  // Attach per-paragraph audio cache (url + hash + alignment) to each
+  // paragraph so the next save can reuse them without calling TTS again.
+  const paragraphsWithAudio = paragraphs.map((p, i) => {
+    const audio = narration.perParagraph[i];
+    if (!audio) return p;
+    return {
+      ...p,
+      narration_url: audio.url,
+      narration_hash: audio.hash,
+      narration_chars: audio.chars,
+    } satisfies Paragraph;
+  });
+
   const version: StoryVersion = {
     id,
     version: opts.version,
     title,
-    paragraphs,
+    paragraphs: paragraphsWithAudio,
     narration_url: narration.url,
     source_answers: opts.sourceAnswers,
     created_at: new Date().toISOString(),
@@ -326,6 +351,7 @@ export async function propagateEditToTranslations(env: Env, edited: StoryVersion
           image_prompt: p.image_prompt,
           image_url: p.image_url,
         })),
+        previousParagraphs: member.paragraphs,
       });
       console.log(`propagate: synced translation ${s.id} (${s.language})`);
     } catch (e) {

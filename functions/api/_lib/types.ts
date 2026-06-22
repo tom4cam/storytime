@@ -12,6 +12,20 @@ export interface Paragraph {
   text: string;
   image_url: string | null;
   image_prompt?: string;
+  // Per-paragraph audio cache. Stored on the server-side StoryVersion so a
+  // later edit can reuse audio for paragraphs whose text+voice didn't change
+  // (publicStory.toPublicStory strips these before sending to the client).
+  // narration_hash = sha256("{voiceId}:{text}"); narration_url points at
+  // an MP3 in the MEDIA bucket; narration_chars holds the per-paragraph
+  // CharacterAlignment so the karaoke timing can be re-stitched without
+  // calling the TTS provider again.
+  narration_url?: string;
+  narration_hash?: string;
+  narration_chars?: {
+    characters: string[];
+    character_start_times_seconds: number[];
+    character_end_times_seconds: number[];
+  };
 }
 
 export interface StoryAnswer {
