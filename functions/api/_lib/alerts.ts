@@ -5,10 +5,19 @@
 // If RESEND_API_KEY is unset the alert is a no-op (logged warning).
 
 import type { Env } from './env';
+import { recordCall } from './telemetry';
 
-const ADMIN_EMAIL = 'caswell.tom@gmail.com';
-const SENDER = 'storytime alerts <onboarding@resend.dev>';
+const DEFAULT_ADMIN_EMAIL = 'caswell.tom@gmail.com';
+const DEFAULT_SENDER = 'storytime alerts <onboarding@resend.dev>';
 const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+
+export function resolveSender(env: Env): string {
+  return env.ALERT_SENDER || DEFAULT_SENDER;
+}
+
+export function resolveRecipient(env: Env): string {
+  return env.ALERT_RECIPIENT || DEFAULT_ADMIN_EMAIL;
+}
 
 export type AlertKind = 'http_429' | 'http_5xx' | 'network_error';
 export type AlertProvider = 'anthropic' | 'openai' | 'fal' | 'elevenlabs';
@@ -56,23 +65,25 @@ export async function notifyAdminFailure(
   }
   try {
     if (!(await shouldSend(env.STORIES as unknown as R2Lite, provider, kind))) return;
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: SENDER,
-        to: [ADMIN_EMAIL],
-        subject: `[storytime] ${provider} ${kind}`,
-        text:
-          `Provider: ${provider}\n` +
-          `Kind:     ${kind}\n` +
-          `Time:     ${new Date().toISOString()}\n` +
-          `Detail:\n${detail.slice(0, 2000)}`,
-      }),
-    });
+    const res = await recordCall(env, 'resend', 'alert', () =>
+      fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: resolveSender(env),
+          to: [resolveRecipient(env)],
+          subject: `[storytime] ${provider} ${kind}`,
+          text:
+            `Provider: ${provider}\n` +
+            `Kind:     ${kind}\n` +
+            `Time:     ${new Date().toISOString()}\n` +
+            `Detail:\n${detail.slice(0, 2000)}`,
+        }),
+      })
+    );
     if (!res.ok) {
       const body = await res.text();
       console.warn(`[alerts] Resend rejected: ${res.status} ${body.slice(0, 200)}`);
@@ -95,19 +106,21 @@ export async function sendAdminEmail(
     return;
   }
   try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: SENDER,
-        to: [ADMIN_EMAIL],
-        subject,
-        text,
-      }),
-    });
+    const res = await recordCall(env, 'resend', 'alert', () =>
+      fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: resolveSender(env),
+          to: [resolveRecipient(env)],
+          subject,
+          text,
+        }),
+      })
+    );
     if (!res.ok) {
       const body = await res.text();
       console.warn(`[alerts] Resend rejected: ${res.status} ${body.slice(0, 200)}`);

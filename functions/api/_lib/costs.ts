@@ -8,7 +8,8 @@
 // would be to use Durable Objects or a KV counter.
 
 import type { Env } from './env';
-import { notifyAdminFailure } from './alerts';
+import { notifyAdminFailure, resolveRecipient, resolveSender } from './alerts';
+import { recordCall } from './telemetry';
 
 export type CostProvider = 'anthropic' | 'openai' | 'fal' | 'elevenlabs';
 export type CostKind =
@@ -180,17 +181,15 @@ async function sendCostCapAlert(env: Env, costs: MonthlyCosts, cap: number): Pro
     return;
   }
   try {
-    const ADMIN_EMAIL = 'caswell.tom@gmail.com';
-    const SENDER = 'storytime alerts <onboarding@resend.dev>';
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await recordCall(env, 'resend', 'alert', () => fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: SENDER,
-        to: [ADMIN_EMAIL],
+        from: resolveSender(env),
+        to: [resolveRecipient(env)],
         subject: `[storytime] Monthly cost cap reached: $${costs.total_usd.toFixed(4)} / $${cap}`,
         text:
           `Monthly cost cap has been reached.\n\n` +
@@ -208,7 +207,7 @@ async function sendCostCapAlert(env: Env, costs: MonthlyCosts, cap: number): Pro
           `  image:       $${costs.by_kind.image.toFixed(4)} (${costs.count_by_kind.image}x)\n` +
           `  moderation:  $${costs.by_kind.moderation.toFixed(4)} (${costs.count_by_kind.moderation}x)\n`,
       }),
-    });
+    }));
     if (!res.ok) {
       const body = await res.text();
       console.warn(`[costs] Resend rejected cost alert: ${res.status} ${body.slice(0, 200)}`);

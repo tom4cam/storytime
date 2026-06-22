@@ -35,6 +35,15 @@ export interface Env {
 
   // Optional alerting (Resend). When unset, alerts log a warning and no-op.
   RESEND_API_KEY?: string;
+  // From-address for Resend emails (alerts + monthly cost cap). Format
+  // is the full "Display Name <user@domain>" string Resend accepts.
+  // Defaults to "storytime alerts <onboarding@resend.dev>" — Resend's
+  // sandbox sender, which only delivers to the Resend account owner.
+  // To send from a verified domain: verify it in the Resend dashboard,
+  // then `wrangler pages secret put ALERT_SENDER 'Storytime <alerts@your.tld>'`.
+  ALERT_SENDER?: string;
+  // To-address for alerts. Defaults to caswell.tom@gmail.com.
+  ALERT_RECIPIENT?: string;
 
   // Optional admin override. When set, requests presenting a matching
   // X-Admin-Token header bypass cookie-based ownership checks on delete.
