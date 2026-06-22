@@ -285,7 +285,7 @@ export function CreatePage() {
             {t('create.hearAgain')}
           </button>
           <div style={{ marginTop: 16 }}>
-            <VoicePicker value={voiceKey} onChange={setVoiceKey} />
+            <VoicePicker value={voiceKey} onChange={setVoiceKey} language={storyLang ?? uiLang} />
           </div>
           <div className="row right" style={{ marginTop: 12 }}>
             <button type="button" className="btn sun" onClick={() => { setStepKind('rhyme'); }}>

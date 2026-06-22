@@ -1,15 +1,29 @@
-import { useState } from 'react';
-import { VOICES, type VoiceMeta } from '../voices';
+import { useEffect, useState } from 'react';
+import { voicesForLang, type VoiceMeta } from '../voices';
+import type { Lang } from '../types';
 import { useT } from '../i18n';
 
 interface Props {
   value: string;
   onChange: (key: string) => void;
+  language: Lang;
 }
 
-export function VoicePicker({ value, onChange }: Props) {
+export function VoicePicker({ value, onChange, language }: Props) {
   const t = useT();
   const [playing, setPlaying] = useState<string | null>(null);
+  const voices = voicesForLang(language);
+
+  // If the current selection isn't valid for this language (e.g. the user
+  // chose Oliver in an English create flow then switched to French), snap
+  // to the first option for the language so we never send an unsupported
+  // voice to the backend.
+  useEffect(() => {
+    if (voices.length === 0) return;
+    if (!voices.some((v) => v.key === value)) {
+      onChange(voices[0].key);
+    }
+  }, [language, value, voices, onChange]);
 
   const playSample = (v: VoiceMeta) => {
     const a = new Audio(v.sampleUrl);
@@ -21,7 +35,7 @@ export function VoicePicker({ value, onChange }: Props) {
 
   return (
     <ul className="voice-list">
-      {VOICES.map((v) => {
+      {voices.map((v) => {
         const checked = value === v.key;
         return (
           <li key={v.key} className={`voice-row${checked ? ' selected' : ''}`}>
