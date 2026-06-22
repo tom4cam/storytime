@@ -43,6 +43,12 @@ export interface Env {
   // Monthly spend cap in USD (default 10). When total_usd crosses this
   // threshold a one-time Resend alert is sent.
   MONTHLY_COST_LIMIT_USD?: string;
+
+  // Absolute origin of the deployed site, used to absolutize relative
+  // /api/media URLs when handing them to upstream services (e.g. flux-pro
+  // kontext needs a fully-qualified image_url to fetch a reference image).
+  // Defaults to https://storytime-app.pages.dev when unset.
+  SITE_URL?: string;
 }
 
 export function requireEnv(env: Env, key: keyof Env): string {

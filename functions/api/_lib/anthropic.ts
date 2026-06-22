@@ -23,18 +23,16 @@ Strict rules:
 JSON shape:
 {
   "title": "A short, fun title under 8 words",
-  "character_bible": "Concrete, unchanging look for each named character, one short clause each. Include species or age, hair, eye and skin color, and a signature outfit with colors. Example: 'Mo: a small brown mouse with big round ears and a red scarf. Lily: a girl, age 6, with curly black hair, brown eyes, and a yellow dress.'",
+  "character_bible": "Visual descriptions only. Format each as 'Name: <species or age>, <hair / fur / scales>, <eye color>, <skin color>, <clothing with specific colors>.' One per line. Concrete physical features only — no personality words. Example: 'Mo: a small brown mouse, big round ears, black eyes, cream belly, red wool scarf, no shoes. Lily: a girl, age 6, curly black hair in two puffs, brown eyes, warm beige skin, yellow corduroy dress, white sneakers.'",
   "paragraphs": [
     {
       "text": "The paragraph text.",
-      "image_prompt": "One sentence describing the scene for a cartoon illustrator. Bright colors, friendly faces, cartoon style, no text in the image."
+      "image_prompt": "Pure scene description. Around 20 words. Name the main character(s), the setting, the action, the mood lighting. Do NOT include style instructions, color palette notes, or 'no text' negatives — those are added downstream. Example: 'Mo the mouse stands on tip-toes at a wooden kitchen counter, kneading bread dough, flour puffing into warm afternoon sunlight.'"
     }
   ]
 }
 
-Image prompts: describe one clear scene per paragraph in cartoon style, child friendly, around 20 words. Mention the main character and the setting each time.
-
-Character consistency (very important): First lock in each named character's look and put it in "character_bible". Then, in every image_prompt, describe each character who appears using the SAME look from the bible, with the same words for hair, colors, and clothing. A character must look identical across all the images. Only change a character's described look if the story itself changes it (for example they put on a costume or get a haircut), and only from that paragraph onward.`;
+Character consistency (very important): First lock each named character's exact visual look in "character_bible". Then, in every image_prompt, repeat the character's defining physical features using the SAME words from the bible (hair, fur, colors, signature clothing). A character must look identical across every image. Only change a character's described look if the story itself changes it (for example they put on a costume or get a haircut), and only from that paragraph onward.`;
 
 const LANG_NAMES: Record<Lang, string> = {
   en: 'English',
@@ -122,7 +120,7 @@ export async function generateCharacterBible(
     response = await client.messages.create({
       model,
       max_tokens: 400,
-      system: 'You are a character designer for a children\'s cartoon. Given a story, list each named character on its own line with a concrete, unchanging visual look: species or age, hair, eye and skin color, and a signature outfit with colors. One short clause per character, for example "Mo: a small brown mouse with big round ears and a red scarf." Infer reasonable, consistent details where the story is silent. Return only the descriptions, no preamble and no JSON.',
+      system: 'You are a character designer for a children\'s picture book. Given a story, list each named character on its own line with a concrete, unchanging visual look. Format: "Name: <species or age>, <hair / fur / scales>, <eye color>, <skin color>, <clothing with specific colors>." Physical features only — no personality words. Infer reasonable, consistent details where the story is silent. Example: "Mo: a small brown mouse, big round ears, black eyes, cream belly, red wool scarf, no shoes." Return only the descriptions, no preamble and no JSON.',
       messages: [{ role: 'user', content: `Title: ${opts.title}\n\n${body}` }],
     });
   } catch (e) {
@@ -154,7 +152,7 @@ export async function regenerateImagePrompt(
     response = await client.messages.create({
       model,
       max_tokens: 200,
-      system: 'Return one short sentence describing the scene for a cartoon illustrator. Bright colors, friendly faces, cartoon style, no text in the image. Around 20 words. No quotes, no prefix.',
+      system: 'Return one short sentence describing the scene only — main character(s), setting, action, mood lighting. Around 20 words. No style instructions, no color palette notes, no negatives like "no text" — those are added downstream. No quotes, no prefix.',
       messages: [
         { role: 'user', content: `Story title: ${storyTitle}\n\nParagraph:\n${paragraphText}${changeLine}\n\nWrite the image prompt only.` },
       ],

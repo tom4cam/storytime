@@ -18,13 +18,38 @@ export class ModerationError extends Error {
 
 const FAL_CONCURRENCY = 10;
 
-// Strips the "Cartoon illustration. Characters: ... Scene: ... Style: ..."
-// wrapper that earlier versions saved on top of the base scene description.
-// Without this, every subsequent edit would re-wrap the already-wrapped
-// prompt, growing it without bound and eventually outrunning FAL.
+// The image-gen style anchor. Flux is sensitive to style tokens; one
+// consistent anchor across every image keeps the whole book visually
+// coherent. Tweak here to evolve the look.
+const IMAGE_STYLE =
+  "Soft modern children's picture book illustration, warm pastel palette, " +
+  'gentle hand-drawn lines, friendly rounded faces, expressive eyes, simple flat shapes';
+
+function siteUrl(env: Env): string {
+  return env.SITE_URL || 'https://storytime-app.pages.dev';
+}
+
+// Turn a relative /api/media URL (what storeMedia returns) into an absolute
+// URL fal can fetch when we pass it as a kontext reference image.
+function absolutizeMediaUrl(env: Env, url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${siteUrl(env)}${url}`;
+}
+
+function wrapImagePrompt(scene: string, characters: string | undefined): string {
+  const charLine = characters?.trim() ? `Characters: ${characters.trim()}. ` : '';
+  return `${IMAGE_STYLE}. ${charLine}Scene: ${scene.trim()}. No text, no signs, no letters in the image.`;
+}
+
+// Defensive: handle any legacy stored prompts that accidentally captured
+// the wrap. We save the bare scene now, so this is a no-op for new data.
 function unwrapImagePrompt(p: string): string {
-  const m = p.match(/^Cartoon illustration\. Characters: [^]*? Scene: ([^]*?) Style: bright colors, friendly faces, cartoon style, no text in the image\.\s*$/);
-  return m ? m[1].trim() : p;
+  const legacy = p.match(/^Cartoon illustration\. Characters: [^]*? Scene: ([^]*?) Style: bright colors, friendly faces, cartoon style, no text in the image\.\s*$/);
+  if (legacy) return legacy[1].trim();
+  const fresh = p.match(/^Soft modern[^]*? Scene: ([^]*?)\.\s*No text, no signs, no letters in the image\.\s*$/);
+  if (fresh) return fresh[1].trim();
+  return p;
 }
 
 export async function moderateAnswers(env: Env, answers: StoryAnswer[]): Promise<void> {
@@ -160,35 +185,65 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
     return { url, words };
   });
 
-  // Batched image generation (respect Fal's 10-concurrent limit).
+  // Image generation. Paragraph 1 is generated text-to-image (or reused
+  // from a prior version); its image is then the kontext reference for
+  // paragraphs 2..N, which is what keeps characters visually consistent
+  // across the book. The reference URL must be absolute and publicly
+  // fetchable by fal — we use the fresh fal CDN URL when we just generated
+  // it, and absolutize the stored /api/media URL when we reused it.
+  const anchor = [opts.character_bible?.trim(), opts.summary?.trim()].filter(Boolean).join(' ');
+
+  const resolveBasePrompt = async (
+    p: BuildOptions['paragraphs'][number],
+    finalText: string,
+  ): Promise<string> => {
+    const instruction = p.change_instruction?.trim();
+    const reuseSaved = !p.regenerate_text && !instruction && !!p.image_prompt && p.image_prompt.trim().length > 0;
+    return reuseSaved
+      ? unwrapImagePrompt(p.image_prompt as string)
+      : regenerateImagePrompt(env, finalText, title, instruction);
+  };
+
   const paragraphs: Paragraph[] = new Array(opts.paragraphs.length);
-  for (let start = 0; start < opts.paragraphs.length; start += FAL_CONCURRENCY) {
+  const firstP = opts.paragraphs[0];
+  const firstNeedsImage = firstP.regenerate_image || !firstP.image_url;
+  let referenceImageUrl: string | null;
+  if (firstNeedsImage) {
+    const basePrompt = await resolveBasePrompt(firstP, finalTexts[0]);
+    const fullPrompt = wrapImagePrompt(basePrompt, anchor);
+    const img = await generateImage(env, fullPrompt);
+    const url = await storeMedia(env, `${id}-v${opts.version}-p1.jpg`, img.data, img.contentType);
+    paragraphs[0] = { text: finalTexts[0], image_url: url, image_prompt: basePrompt };
+    // Fresh fal CDN URL — fetchable for many minutes, no R2 round trip.
+    referenceImageUrl = img.sourceUrl;
+  } else {
+    paragraphs[0] = {
+      text: finalTexts[0],
+      image_url: firstP.image_url,
+      image_prompt: firstP.image_prompt ? unwrapImagePrompt(firstP.image_prompt) : undefined,
+    };
+    referenceImageUrl = absolutizeMediaUrl(env, firstP.image_url);
+  }
+
+  for (let start = 1; start < opts.paragraphs.length; start += FAL_CONCURRENCY) {
     const slice = opts.paragraphs.slice(start, start + FAL_CONCURRENCY);
     const results = await Promise.all(slice.map(async (p, j) => {
       const i = start + j;
       const finalText = finalTexts[i];
       const needsImage = p.regenerate_image || !p.image_url;
       if (!needsImage) {
-        return { text: finalText, image_url: p.image_url, image_prompt: p.image_prompt } satisfies Paragraph;
+        return {
+          text: finalText,
+          image_url: p.image_url,
+          image_prompt: p.image_prompt ? unwrapImagePrompt(p.image_prompt) : undefined,
+        } satisfies Paragraph;
       }
-      const instruction = p.change_instruction?.trim();
-      // Reuse the saved prompt only when nothing should change it. If the text
-      // was rewritten or the user gave a change instruction, derive a fresh
-      // prompt from the final text (weaving the instruction in) so the picture
-      // matches the new wording / requested change.
-      const reuseSaved = !p.regenerate_text && !instruction && !!p.image_prompt && p.image_prompt.trim().length > 0;
-      const basePrompt = reuseSaved
-        ? unwrapImagePrompt(p.image_prompt as string)
-        : await regenerateImagePrompt(env, finalText, title, instruction);
-      // Anchor every image on the same character descriptions (the bible keeps
-      // characters consistent across this story and its sequels; the optional
-      // user summary supplements it).
-      const anchor = [opts.character_bible?.trim(), opts.summary?.trim()].filter(Boolean).join(' ');
-      const prompt = anchor
-        ? `Cartoon illustration. Characters: ${anchor} Scene: ${basePrompt} Style: bright colors, friendly faces, cartoon style, no text in the image.`
-        : basePrompt;
-      const img = await generateImage(env, prompt);
-      const url = await storeMedia(env, `${id}-v${opts.version}-p${i + 1}.png`, img.data, img.contentType);
+      const basePrompt = await resolveBasePrompt(p, finalText);
+      const fullPrompt = wrapImagePrompt(basePrompt, anchor);
+      const img = await generateImage(env, fullPrompt, {
+        referenceImageUrl: referenceImageUrl ?? undefined,
+      });
+      const url = await storeMedia(env, `${id}-v${opts.version}-p${i + 1}.jpg`, img.data, img.contentType);
       return { text: finalText, image_url: url, image_prompt: basePrompt } satisfies Paragraph;
     }));
     for (let j = 0; j < results.length; j += 1) paragraphs[start + j] = results[j];

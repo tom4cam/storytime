@@ -25,7 +25,10 @@ import { fetchWithRetry } from './retry';
 
 const OPENAI_TTS_DEFAULT_MODEL = 'tts-1';
 const OPENAI_STT_MODEL = 'whisper-1';
-const OPENAI_DEFAULT_VOICE = 'nova';
+// Fable is the only British male voice in OpenAI's preset list. Matches
+// the ElevenLabs default (Daniel, also British male) so the two providers
+// stay in the same vocal register when one falls back to the other.
+const OPENAI_DEFAULT_VOICE = 'fable';
 const OPENAI_VOICES = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
 // Models that accept the `instructions` field for voice steering.
 const OPENAI_STEERABLE_MODELS = new Set(['gpt-4o-mini-tts', 'gpt-4o-tts']);
