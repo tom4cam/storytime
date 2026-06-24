@@ -1,9 +1,11 @@
 // One-shot: rebuild Bob's Big Butter Adventure and The Big Blue Tooth Bus
-// on the new kontext pipeline + soft-modern-picture-book style anchor, and
-// re-narrate them with the per-paragraph synth path.
+// on the current image pipeline (flux/schnell text-to-image + per-story seed
+// for character consistency + the vision QC retry pass) and the
+// soft-modern-picture-book style anchor, re-narrating with the per-paragraph
+// synth path.
 //
 // Text is kept verbatim (image_prompt is reused too — wrapImagePrompt's
-// new style anchor still kicks in). Images and audio are fully regenerated.
+// style anchor still kicks in). Images and audio are fully regenerated.
 // For Big Blue Tooth Bus, propagateEditToTranslations syncs the 5
 // translations (es/fr/it/bg/sv) so they all share the new English images.
 //

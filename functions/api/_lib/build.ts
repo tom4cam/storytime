@@ -2,7 +2,7 @@
 // background work and updateStory's background work.
 
 import type { Env } from './env';
-import { generateStory, regenerateImagePrompt, regenerateParagraphText, translateStory as runTranslation } from './anthropic';
+import { checkImageQuality, generateStory, regenerateImagePrompt, regenerateParagraphText, translateStory as runTranslation } from './anthropic';
 import { synthesizeStory } from './narration';
 import { generateImage } from './fal';
 import { moderate } from './moderation';
@@ -24,21 +24,58 @@ const IMAGE_STYLE =
   "Soft modern children's picture book illustration, warm pastel palette, " +
   'gentle hand-drawn lines, friendly rounded faces, expressive eyes, simple flat shapes';
 
-function siteUrl(env: Env): string {
-  return env.SITE_URL || 'https://storytime-app.pages.dev';
-}
-
-// Turn a relative /api/media URL (what storeMedia returns) into an absolute
-// URL fal can fetch when we pass it as a kontext reference image.
-function absolutizeMediaUrl(env: Env, url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (/^https?:\/\//i.test(url)) return url;
-  return `${siteUrl(env)}${url}`;
-}
-
 function wrapImagePrompt(scene: string, characters: string | undefined): string {
   const charLine = characters?.trim() ? `Characters: ${characters.trim()}. ` : '';
   return `${IMAGE_STYLE}. ${charLine}Scene: ${scene.trim()}. No text, no signs, no letters in the image.`;
+}
+
+// Up to this many tries per image when the QC pass rejects one (the first
+// try plus two regenerations with a fresh seed).
+const IMAGE_QC_MAX_ATTEMPTS = 3;
+
+// A deterministic per-story seed. Sharing one seed across every paragraph's
+// image nudges flux/schnell toward a consistent character/style look across
+// the book (schnell has no image conditioning, so this is the main lever).
+function seedFromId(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i += 1) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % 1_000_000;
+}
+
+function qcEnabled(env: Env): boolean {
+  const v = (env.IMAGE_QC_DISABLED || '').toLowerCase();
+  return !(v === '1' || v === 'true' || v === 'yes');
+}
+
+// Generate an image, then (unless QC is disabled) run a vision check for
+// anatomical/composition defects. On a rejection, regenerate with a different
+// seed. After exhausting attempts we keep the last image rather than failing
+// the whole story over one imperfect picture.
+async function generateCheckedImage(
+  env: Env,
+  fullPrompt: string,
+  opts: { seed: number; characters: string; scene: string },
+): Promise<{ data: ArrayBuffer; contentType: string }> {
+  const withQc = qcEnabled(env);
+  const attempts = withQc ? IMAGE_QC_MAX_ATTEMPTS : 1;
+  let last: { data: ArrayBuffer; contentType: string } | null = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const img = await generateImage(env, fullPrompt, { seed: opts.seed + attempt });
+    last = img;
+    if (!withQc) return img;
+    const verdict = await checkImageQuality(env, {
+      image: img.data,
+      contentType: img.contentType,
+      characters: opts.characters,
+      scene: opts.scene,
+    });
+    if (verdict.ok) return img;
+    console.warn(`[build] image QC rejected (attempt ${attempt + 1}/${attempts}): ${verdict.problems.join('; ')}`);
+  }
+  return last as { data: ArrayBuffer; contentType: string };
 }
 
 // Defensive: handle any legacy stored prompts that accidentally captured
@@ -197,13 +234,12 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
     perParagraph,
   }));
 
-  // Image generation. Paragraph 1 is generated text-to-image (or reused
-  // from a prior version); its image is then the kontext reference for
-  // paragraphs 2..N, which is what keeps characters visually consistent
-  // across the book. The reference URL must be absolute and publicly
-  // fetchable by fal — we use the fresh fal CDN URL when we just generated
-  // it, and absolutize the stored /api/media URL when we reused it.
+  // Image generation. Each paragraph's image is generated independently,
+  // text-to-image, from its style-wrapped prompt. Paragraphs whose text and
+  // prompt are unchanged reuse their stored image. Batched to respect the
+  // fal concurrency budget.
   const anchor = [opts.character_bible?.trim(), opts.summary?.trim()].filter(Boolean).join(' ');
+  const storySeed = seedFromId(id);
 
   const resolveBasePrompt = async (
     p: BuildOptions['paragraphs'][number],
@@ -217,27 +253,7 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
   };
 
   const paragraphs: Paragraph[] = new Array(opts.paragraphs.length);
-  const firstP = opts.paragraphs[0];
-  const firstNeedsImage = firstP.regenerate_image || !firstP.image_url;
-  let referenceImageUrl: string | null;
-  if (firstNeedsImage) {
-    const basePrompt = await resolveBasePrompt(firstP, finalTexts[0]);
-    const fullPrompt = wrapImagePrompt(basePrompt, anchor);
-    const img = await generateImage(env, fullPrompt);
-    const url = await storeMedia(env, `${id}-v${opts.version}-p1.jpg`, img.data, img.contentType);
-    paragraphs[0] = { text: finalTexts[0], image_url: url, image_prompt: basePrompt };
-    // Fresh fal CDN URL — fetchable for many minutes, no R2 round trip.
-    referenceImageUrl = img.sourceUrl;
-  } else {
-    paragraphs[0] = {
-      text: finalTexts[0],
-      image_url: firstP.image_url,
-      image_prompt: firstP.image_prompt ? unwrapImagePrompt(firstP.image_prompt) : undefined,
-    };
-    referenceImageUrl = absolutizeMediaUrl(env, firstP.image_url);
-  }
-
-  for (let start = 1; start < opts.paragraphs.length; start += FAL_CONCURRENCY) {
+  for (let start = 0; start < opts.paragraphs.length; start += FAL_CONCURRENCY) {
     const slice = opts.paragraphs.slice(start, start + FAL_CONCURRENCY);
     const results = await Promise.all(slice.map(async (p, j) => {
       const i = start + j;
@@ -252,8 +268,10 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
       }
       const basePrompt = await resolveBasePrompt(p, finalText);
       const fullPrompt = wrapImagePrompt(basePrompt, anchor);
-      const img = await generateImage(env, fullPrompt, {
-        referenceImageUrl: referenceImageUrl ?? undefined,
+      const img = await generateCheckedImage(env, fullPrompt, {
+        seed: storySeed,
+        characters: anchor,
+        scene: basePrompt,
       });
       const url = await storeMedia(env, `${id}-v${opts.version}-p${i + 1}.jpg`, img.data, img.contentType);
       return { text: finalText, image_url: url, image_prompt: basePrompt } satisfies Paragraph;

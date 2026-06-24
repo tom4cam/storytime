@@ -10,42 +10,43 @@ interface FalImageResponse {
   has_nsfw_concepts?: boolean[];
 }
 
-export interface GenerateImageOpts {
-  // When set, calls flux-pro/kontext to condition the new image on this
-  // reference. Used to keep characters visually consistent across the
-  // paragraphs of one story: paragraph 1 is generated text-to-image, then
-  // 2..N reference 1's image. Must be a fully-qualified URL fal can fetch.
-  referenceImageUrl?: string;
-}
+// flux/schnell: fast, cheap text-to-image. Each paragraph's image is generated
+// independently from its (already style-wrapped) prompt. The style anchor and
+// character descriptions are baked into the prompt by build.ts, so this stays
+// a dumb pass-through.
+const SCHNELL = 'https://fal.run/fal-ai/flux/schnell';
 
-const KONTEXT_T2I = 'https://fal.run/fal-ai/flux-pro/kontext/text-to-image';
-const KONTEXT_EDIT = 'https://fal.run/fal-ai/flux-pro/kontext';
+export interface GenerateImageOpts {
+  // A fixed seed shared by every image in one story nudges flux toward a
+  // consistent look across paragraphs (schnell has no image conditioning, so
+  // this is the main lever for visual coherence). On a quality retry we vary
+  // the seed so we don't regenerate the same broken image.
+  seed?: number;
+}
 
 export async function generateImage(
   env: Env,
   prompt: string,
   opts: GenerateImageOpts = {},
-): Promise<{ data: ArrayBuffer; contentType: string; sourceUrl: string }> {
+): Promise<{ data: ArrayBuffer; contentType: string }> {
   const apiKey = requireEnv(env, 'FAL_KEY');
-  const isConditioned = !!opts.referenceImageUrl;
-  const endpoint = isConditioned ? KONTEXT_EDIT : KONTEXT_T2I;
   const body: Record<string, unknown> = {
     prompt,
-    aspect_ratio: '1:1',
-    output_format: 'jpeg',
-    safety_tolerance: '2',
+    image_size: 'square_hd',
+    num_inference_steps: 4,
     num_images: 1,
+    enable_safety_checker: true,
   };
-  if (isConditioned) body.image_url = opts.referenceImageUrl;
+  if (opts.seed !== undefined) body.seed = opts.seed;
 
   let res: Response;
   try {
     res = await recordCall(env, 'fal', 'image', () =>
-      fetchWithRetry(endpoint, {
+      fetchWithRetry(SCHNELL, {
         method: 'POST',
         headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }, { timeoutMs: 60_000 })
+      }, { timeoutMs: 30_000 })
     );
   } catch (e) {
     await notifyAdminFailure(env, 'fal', 'network_error', (e as Error).message);
@@ -65,7 +66,7 @@ export async function generateImage(
   if (!imgRes.ok) throw new Error(`Could not download Fal image (${imgRes.status})`);
   const data = await imgRes.arrayBuffer();
   const contentType = first.content_type || imgRes.headers.get('content-type') || 'image/jpeg';
-  // flux-pro/kontext (both variants): $0.04 per image at the published rate.
-  void recordCost(env, 'fal', 'image', 0.04);
-  return { data, contentType, sourceUrl: url };
+  // flux/schnell: ~$0.003 per image at the published rate.
+  void recordCost(env, 'fal', 'image', 0.003);
+  return { data, contentType };
 }

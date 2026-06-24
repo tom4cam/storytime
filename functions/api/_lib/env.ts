@@ -26,6 +26,13 @@ export interface Env {
   // Public vars
   ANTHROPIC_MODEL?: string;
 
+  // Image quality control (vision pass that retries anatomically broken
+  // illustrations). IMAGE_QC_MODEL defaults to "claude-haiku-4-5" (cheap
+  // vision). Set IMAGE_QC_DISABLED to "1"/"true" to skip the QC pass and its
+  // per-image cost entirely.
+  IMAGE_QC_MODEL?: string;
+  IMAGE_QC_DISABLED?: string;
+
   // Optional OpenAI TTS overrides. OPENAI_TTS_MODEL defaults to "tts-1";
   // set to "gpt-4o-mini-tts" to enable the steerable model. When the model
   // is steerable, OPENAI_TTS_INSTRUCTIONS is sent as the `instructions`

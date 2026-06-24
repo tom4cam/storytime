@@ -17,6 +17,7 @@ export type CostKind =
   | 'translation'
   | 'tts'
   | 'image'
+  | 'image_qc'
   | 'moderation';
 
 export interface MonthlyCosts {
@@ -33,6 +34,7 @@ export interface MonthlyCosts {
     translation: number;
     tts: number;
     image: number;
+    image_qc: number;
     moderation: number;
   };
   count_by_kind: {
@@ -40,6 +42,7 @@ export interface MonthlyCosts {
     translation: number;
     tts: number;
     image: number;
+    image_qc: number;
     moderation: number;
   };
   cost_alerted: boolean;
@@ -62,8 +65,8 @@ function emptyMonth(month: string): MonthlyCosts {
     month,
     total_usd: 0,
     by_provider: { anthropic: 0, openai: 0, fal: 0, elevenlabs: 0 },
-    by_kind: { story_gen: 0, translation: 0, tts: 0, image: 0, moderation: 0 },
-    count_by_kind: { story_gen: 0, translation: 0, tts: 0, image: 0, moderation: 0 },
+    by_kind: { story_gen: 0, translation: 0, tts: 0, image: 0, image_qc: 0, moderation: 0 },
+    count_by_kind: { story_gen: 0, translation: 0, tts: 0, image: 0, image_qc: 0, moderation: 0 },
     cost_alerted: false,
     updated_at: new Date().toISOString(),
   };
@@ -116,6 +119,59 @@ export async function isOverMonthlyCap(env: Env): Promise<boolean> {
 export const CAP_REACHED_MESSAGE =
   'The story maker has reached its monthly budget. New stories will be possible again next month.';
 
+// --- Anthropic token pricing -------------------------------------------------
+// Published list prices in USD per million tokens, by model. Cache reads bill
+// at ~0.1x input and 5-minute cache writes at ~1.25x input; we include them so
+// the figure stays correct if prompt caching is ever turned on (today these
+// calls don't cache, so the cache fields are 0).
+interface ModelPrice {
+  in: number;
+  out: number;
+}
+const ANTHROPIC_PRICES: Record<string, ModelPrice> = {
+  'claude-opus-4-8': { in: 5, out: 25 },
+  'claude-opus-4-7': { in: 5, out: 25 },
+  'claude-sonnet-4-6': { in: 3, out: 15 },
+  'claude-haiku-4-5': { in: 1, out: 5 },
+};
+// Unknown model id -> assume Sonnet-tier so we never under-bill to zero.
+const DEFAULT_ANTHROPIC_PRICE: ModelPrice = { in: 3, out: 15 };
+
+// The subset of the Anthropic SDK's `usage` object we price on.
+export interface AnthropicUsage {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+}
+
+export function anthropicCostUsd(model: string, usage: AnthropicUsage | null | undefined): number {
+  const price = ANTHROPIC_PRICES[model] ?? DEFAULT_ANTHROPIC_PRICE;
+  const u = usage ?? {};
+  const input = u.input_tokens ?? 0;
+  const output = u.output_tokens ?? 0;
+  const cacheRead = u.cache_read_input_tokens ?? 0;
+  const cacheWrite = u.cache_creation_input_tokens ?? 0;
+  const usd =
+    (input * price.in +
+      output * price.out +
+      cacheRead * price.in * 0.1 +
+      cacheWrite * price.in * 1.25) /
+    1_000_000;
+  return usd > 0 ? usd : 0;
+}
+
+// Convenience sink: compute the real cost of an Anthropic call from its usage
+// and record it. Fire-and-forget like recordCost.
+export async function recordAnthropicUsage(
+  env: Env,
+  kind: CostKind,
+  model: string,
+  usage: AnthropicUsage | null | undefined,
+): Promise<void> {
+  await recordCost(env, 'anthropic', kind, anthropicCostUsd(model, usage));
+}
+
 export async function recordCost(
   env: Env,
   provider: CostProvider,
@@ -140,18 +196,22 @@ export async function recordCost(
       { anthropic: 0, openai: 0, fal: 0, elevenlabs: 0 },
       current.by_provider,
     );
+    // Same backfill for by_kind / count_by_kind: a month file written before
+    // 'image_qc' existed would otherwise increment `undefined + usd` -> NaN.
+    const kindBase = Object.assign(
+      { story_gen: 0, translation: 0, tts: 0, image: 0, image_qc: 0, moderation: 0 },
+      current.by_kind,
+    );
+    const countBase = Object.assign(
+      { story_gen: 0, translation: 0, tts: 0, image: 0, image_qc: 0, moderation: 0 },
+      current.count_by_kind,
+    );
     const updated: MonthlyCosts = {
       ...current,
       total_usd: current.total_usd + usd,
       by_provider: { ...providerBase, [provider]: providerBase[provider] + usd },
-      by_kind: {
-        ...current.by_kind,
-        [kind]: current.by_kind[kind] + usd,
-      },
-      count_by_kind: {
-        ...current.count_by_kind,
-        [kind]: current.count_by_kind[kind] + 1,
-      },
+      by_kind: { ...kindBase, [kind]: kindBase[kind] + usd },
+      count_by_kind: { ...countBase, [kind]: countBase[kind] + 1 },
       updated_at: new Date().toISOString(),
     };
 
@@ -205,6 +265,7 @@ async function sendCostCapAlert(env: Env, costs: MonthlyCosts, cap: number): Pro
           `  translation: $${costs.by_kind.translation.toFixed(4)} (${costs.count_by_kind.translation}x)\n` +
           `  tts:         $${costs.by_kind.tts.toFixed(4)} (${costs.count_by_kind.tts}x)\n` +
           `  image:       $${costs.by_kind.image.toFixed(4)} (${costs.count_by_kind.image}x)\n` +
+          `  image_qc:    $${(costs.by_kind.image_qc ?? 0).toFixed(4)} (${costs.count_by_kind.image_qc ?? 0}x)\n` +
           `  moderation:  $${costs.by_kind.moderation.toFixed(4)} (${costs.count_by_kind.moderation}x)\n`,
       }),
     }));

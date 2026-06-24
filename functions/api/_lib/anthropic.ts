@@ -5,7 +5,7 @@ import type { Env } from './env';
 import type { GeneratedStory, Lang, StoryAnswer } from './types';
 import { requireEnv } from './env';
 import { notifyAdminFailure } from './alerts';
-import { recordCost } from './costs';
+import { recordAnthropicUsage } from './costs';
 import { recordCall } from './telemetry';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
@@ -19,21 +19,78 @@ Strict rules:
 - Include a small, age appropriate problem and a kind, satisfying ending.
 - Keep the tone warm and a little playful.
 - Do not use hyphens or em dashes or emojis. Prefer commas and periods.
-- Output strict JSON. No prose outside the JSON. No code fences.
 
-JSON shape:
-{
-  "title": "A short, fun title under 8 words",
-  "character_bible": "Visual descriptions only. Format each as 'Name: <species or age>, <hair / fur / scales>, <eye color>, <skin color>, <clothing with specific colors>.' One per line. Concrete physical features only — no personality words. Example: 'Mo: a small brown mouse, big round ears, black eyes, cream belly, red wool scarf, no shoes. Lily: a girl, age 6, curly black hair in two puffs, brown eyes, warm beige skin, yellow corduroy dress, white sneakers.'",
-  "paragraphs": [
-    {
-      "text": "The paragraph text.",
-      "image_prompt": "Pure scene description. Around 20 words. Name the main character(s), the setting, the action, the mood lighting. Do NOT include style instructions, color palette notes, or 'no text' negatives — those are added downstream. Example: 'Mo the mouse stands on tip-toes at a wooden kitchen counter, kneading bread dough, flour puffing into warm afternoon sunlight.'"
-    }
-  ]
-}
+Submit the finished story by calling the submit_story tool. Fill in title, character_bible, and one paragraph object (text plus image_prompt) per paragraph.
 
 Character consistency (very important): First lock each named character's exact visual look in "character_bible". Then, in every image_prompt, repeat the character's defining physical features using the SAME words from the bible (hair, fur, colors, signature clothing). A character must look identical across every image. Only change a character's described look if the story itself changes it (for example they put on a costume or get a haircut), and only from that paragraph onward.`;
+
+// Forced-tool schema for story generation. Using tool-use (like translateStory)
+// gives us SDK-parsed structured output instead of hand-slicing a JSON string
+// out of a text completion — no more brittle brace-matching or code-fence
+// stripping, and the model can't wander off-shape.
+const STORY_TOOL = {
+  name: 'submit_story',
+  description: 'Submit the finished illustrated children\'s story.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      title: { type: 'string', description: 'A short, fun title under 8 words.' },
+      character_bible: {
+        type: 'string',
+        description:
+          "Visual descriptions only. Format each as 'Name: <species or age>, <hair / fur / scales>, <eye color>, <skin color>, <clothing with specific colors>.' One per line. Concrete physical features only, no personality words. Example: 'Mo: a small brown mouse, big round ears, black eyes, cream belly, red wool scarf, no shoes. Lily: a girl, age 6, curly black hair in two puffs, brown eyes, warm beige skin, yellow corduroy dress, white sneakers.'",
+      },
+      paragraphs: {
+        type: 'array',
+        description: '5 to 8 paragraphs, in order.',
+        items: {
+          type: 'object',
+          properties: {
+            text: { type: 'string', description: 'The paragraph text, 2 to 4 sentences, in the target language.' },
+            image_prompt: {
+              type: 'string',
+              description:
+                "Pure scene description, around 20 words, in English even when the story text is in another language. Name the main character(s), the setting, the action, the mood lighting, repeating each character's defining physical features using the same words as character_bible. Do NOT include style instructions, color palette notes, or 'no text' negatives, those are added downstream. Example: 'Mo the mouse stands on tip-toes at a wooden kitchen counter, kneading bread dough, flour puffing into warm afternoon sunlight.'",
+            },
+          },
+          required: ['text', 'image_prompt'],
+        },
+      },
+    },
+    required: ['title', 'paragraphs'],
+  },
+};
+
+// Normalise the submit_story tool input into a GeneratedStory. Exported for
+// tests. Defensive against the model emitting `paragraphs` as a stringified
+// JSON array (a known non-Latin-script failure mode also handled in
+// translateStory).
+export function __coerceStoryInput(input: unknown): GeneratedStory {
+  if (!input || typeof input !== 'object') throw new Error('story: tool input was not an object');
+  const obj = input as Record<string, unknown>;
+  const title = typeof obj.title === 'string' ? obj.title.trim() : '';
+  if (!title) throw new Error('story: missing title');
+  const character_bible = typeof obj.character_bible === 'string' ? obj.character_bible.trim() : '';
+
+  let rawParas: unknown = obj.paragraphs;
+  if (typeof rawParas === 'string') {
+    const t = rawParas.trim();
+    if (t.startsWith('[') && t.endsWith(']')) {
+      try { rawParas = JSON.parse(t); } catch { /* fall through to the array check */ }
+    }
+  }
+  if (!Array.isArray(rawParas) || rawParas.length === 0) throw new Error('story: missing paragraphs');
+
+  const paragraphs = rawParas.map((p, i) => {
+    const item = (p ?? {}) as Record<string, unknown>;
+    const text = typeof item.text === 'string' ? item.text : '';
+    const image_prompt = typeof item.image_prompt === 'string' ? item.image_prompt : '';
+    if (!text) throw new Error(`story: paragraph ${i + 1} missing text`);
+    return { text, image_prompt };
+  });
+
+  return character_bible ? { title, character_bible, paragraphs } : { title, paragraphs };
+}
 
 const LANG_NAMES: Record<Lang, string> = {
   en: 'English',
@@ -74,12 +131,16 @@ export async function generateStory(
     response = await recordCall(env, 'anthropic', 'story_gen', () =>
       client.messages.create({
         model,
-        max_tokens: 3000,
+        // Generous cap so a non-Latin-script story (Cyrillic tokenizes at
+        // multiple tokens per char) never truncates before the tool call closes.
+        max_tokens: 8000,
         system: STORY_SYSTEM_PROMPT,
+        tools: [STORY_TOOL],
+        tool_choice: { type: 'tool', name: 'submit_story' },
         messages: [
           {
             role: 'user',
-            content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\n${rhymeInstruction}${sequelInstruction}\n\nReturn only the JSON object.`,
+            content: `Here are the kid's answers. Use them to write the story.\n\n${formattedAnswers}\n\n${languageInstruction}\n\n${rhymeInstruction}${sequelInstruction}\n\nCall the submit_story tool with the finished story.`,
           },
         ],
       })
@@ -89,21 +150,15 @@ export async function generateStory(
     throw e;
   }
 
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') throw new Error('Claude did not return any text');
-  const raw = textBlock.text.trim();
-  const jsonStart = raw.indexOf('{');
-  const jsonEnd = raw.lastIndexOf('}');
-  if (jsonStart === -1 || jsonEnd === -1) throw new Error(`Claude returned non JSON: ${raw.slice(0, 200)}`);
-  const slice = raw.slice(jsonStart, jsonEnd + 1);
-  let parsed: GeneratedStory;
-  try { parsed = JSON.parse(slice) as GeneratedStory; }
-  catch (e) { throw new Error(`Could not parse Claude JSON: ${(e as Error).message}`); }
-  if (!parsed.title || !Array.isArray(parsed.paragraphs) || parsed.paragraphs.length === 0) {
-    throw new Error('Claude JSON missing required fields');
+  const toolBlock = response.content.find((b) => b.type === 'tool_use');
+  if (!toolBlock || toolBlock.type !== 'tool_use') {
+    if (response.stop_reason === 'max_tokens') {
+      throw new Error('story: response truncated at max_tokens before tool call completed');
+    }
+    throw new Error(`story: Claude did not call submit_story (stop=${response.stop_reason})`);
   }
-  // Flat rate estimate: $0.015 per story_gen call (refine with token usage later).
-  void recordCost(env, 'anthropic', 'story_gen', 0.015);
+  const parsed = __coerceStoryInput(toolBlock.input);
+  void recordAnthropicUsage(env, 'story_gen', model, response.usage);
   return parsed;
 }
 
@@ -130,9 +185,9 @@ export async function generateCharacterBible(
     await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
     throw e;
   }
+  void recordAnthropicUsage(env, 'story_gen', model, response.usage);
   const block = response.content.find((b) => b.type === 'text');
   if (!block || block.type !== 'text') return '';
-  void recordCost(env, 'anthropic', 'story_gen', 0.005);
   return block.text.trim().replace(/^"|"$/g, '');
 }
 
@@ -164,6 +219,7 @@ export async function regenerateImagePrompt(
     await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
     throw e;
   }
+  void recordAnthropicUsage(env, 'story_gen', model, response.usage);
   const block = response.content.find((b) => b.type === 'text');
   if (!block || block.type !== 'text') return paragraphText.slice(0, 200);
   return block.text.trim().replace(/^"|"$/g, '');
@@ -200,10 +256,10 @@ export async function regenerateParagraphText(
     await notifyAdminFailure(env, 'anthropic', 'network_error', (e as Error).message);
     throw e;
   }
+  void recordAnthropicUsage(env, 'story_gen', model, response.usage);
   const block = response.content.find((b) => b.type === 'text');
   if (!block || block.type !== 'text') return opts.originalText;
   const text = block.text.trim().replace(/^"|"$/g, '');
-  void recordCost(env, 'anthropic', 'story_gen', 0.005);
   return text || opts.originalText;
 }
 
@@ -289,8 +345,7 @@ export async function translateStory(
   if (parsed.paragraphs.length !== source.paragraphs.length) {
     throw new Error(`translation: expected ${source.paragraphs.length} paragraphs, got ${parsed.paragraphs.length}`);
   }
-  // Flat rate estimate: $0.01 per translation call.
-  void recordCost(env, 'anthropic', 'translation', 0.01);
+  void recordAnthropicUsage(env, 'translation', model, res.usage);
   return parsed;
 }
 
@@ -343,4 +398,117 @@ function coerceParagraphsArray(value: unknown): string[] | null {
     }
   }
   return null;
+}
+
+// --- Image quality control (vision) -----------------------------------------
+// flux/schnell occasionally produces anatomically broken illustrations (extra
+// limbs, two heads, a head with no body, mangled hands, stray extra people).
+// checkImageQuality runs a cheap vision pass to catch the clear cases so the
+// build loop can regenerate them with a different seed.
+
+const DEFAULT_QC_MODEL = 'claude-haiku-4-5';
+
+function arrayBufferToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+type QcMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+function normalizeMediaType(ct: string): QcMediaType {
+  const c = ct.toLowerCase();
+  if (c.includes('png')) return 'image/png';
+  if (c.includes('gif')) return 'image/gif';
+  if (c.includes('webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+export interface ImageQcVerdict {
+  ok: boolean;
+  problems: string[];
+}
+
+// Exported for tests. Normalises the report_image tool input. Errs toward
+// "acceptable": a vague/empty verdict should never reject a usable image.
+export function __coerceQcVerdict(input: unknown): ImageQcVerdict {
+  if (!input || typeof input !== 'object') return { ok: true, problems: [] };
+  const obj = input as Record<string, unknown>;
+  const problems = Array.isArray(obj.problems)
+    ? obj.problems.map((p) => String(p)).filter((p) => p.trim().length > 0)
+    : [];
+  // Reject only when the model both says not-ok AND names a concrete problem.
+  const flaggedOk = typeof obj.ok === 'boolean' ? obj.ok : problems.length === 0;
+  return { ok: flaggedOk || problems.length === 0, problems };
+}
+
+export async function checkImageQuality(
+  env: Env,
+  opts: { image: ArrayBuffer; contentType: string; characters: string; scene: string },
+): Promise<ImageQcVerdict> {
+  const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
+  const client = new Anthropic({ apiKey });
+  const model = env.IMAGE_QC_MODEL || DEFAULT_QC_MODEL;
+  const charLine = opts.characters.trim() ? `Expected characters: ${opts.characters.trim()}\n` : '';
+
+  let res: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    // Telemetry kind 'moderation' (closest existing bucket); cost kind 'image_qc'.
+    res = await recordCall(env, 'anthropic', 'moderation', () => client.messages.create({
+      model,
+      max_tokens: 300,
+      system:
+        "You inspect AI-generated children's book illustrations for clear anatomical or composition defects. " +
+        'Flag ONLY obvious, unmistakable problems: a character with extra or missing limbs, more than one head, ' +
+        'a head with no body, fused or melted faces, badly mangled or extra hands and fingers, or extra people ' +
+        'who do not belong in the scene. Do NOT flag art style, coloring, cropping, background detail, or minor ' +
+        'imperfections. When unsure, treat the image as acceptable. Always call the report_image tool.',
+      tools: [
+        {
+          name: 'report_image',
+          description: 'Report whether the illustration is free of anatomical and composition defects.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              ok: { type: 'boolean', description: 'true if the image has no clear defect.' },
+              problems: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Short list of any clear defects found. Empty when the image is fine.',
+              },
+            },
+            required: ['ok', 'problems'],
+          },
+        },
+      ],
+      tool_choice: { type: 'tool', name: 'report_image' },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: normalizeMediaType(opts.contentType),
+                data: arrayBufferToBase64(opts.image),
+              },
+            },
+            { type: 'text', text: `${charLine}Scene: ${opts.scene.trim()}\n\nInspect the illustration and call report_image.` },
+          ],
+        },
+      ],
+    }));
+  } catch (e) {
+    // QC must never break the build. On any error, accept the image.
+    await notifyAdminFailure(env, 'anthropic', 'network_error', `image_qc: ${(e as Error).message}`);
+    return { ok: true, problems: [] };
+  }
+  void recordAnthropicUsage(env, 'image_qc', model, res.usage);
+  const block = res.content.find((b) => b.type === 'tool_use');
+  if (!block || block.type !== 'tool_use') return { ok: true, problems: [] };
+  return __coerceQcVerdict(block.input);
 }
