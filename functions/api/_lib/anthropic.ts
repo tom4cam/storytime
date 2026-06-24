@@ -401,10 +401,15 @@ function coerceParagraphsArray(value: unknown): string[] | null {
 }
 
 // --- Image quality control (vision) -----------------------------------------
-// flux/schnell occasionally produces anatomically broken illustrations (extra
-// limbs, two heads, a head with no body, mangled hands, stray extra people).
-// checkImageQuality runs a cheap vision pass to catch the clear cases so the
-// build loop can regenerate them with a different seed.
+// flux/schnell occasionally produces illustrations that are unusable for a
+// kids' book: broken anatomy (extra limbs, two heads, a head with no body,
+// mangled hands), content that is not G-rated (anything scary, violent, sad,
+// or otherwise inappropriate for a young child), or garbled artifacts (nonsense
+// text baked into the image, smearing). checkImageQuality runs a cheap vision
+// pass to catch the clear cases so the build loop can regenerate them with a
+// different seed. It deliberately does NOT judge story/character fidelity
+// (clothing, age, identity, how many people) — that over-rejects every usable
+// illustration and never converges.
 
 const DEFAULT_QC_MODEL = 'claude-haiku-4-5';
 
@@ -456,37 +461,42 @@ export async function checkImageQuality(
   let res: Awaited<ReturnType<typeof client.messages.create>>;
   try {
     // Telemetry kind 'moderation' (closest existing bucket); cost kind 'image_qc'.
-    // IMPORTANT: this checks ONLY for the kind of grotesque anatomy glitches
-    // image generators produce. It must NOT judge clothing, identity, age,
-    // how many people are present, or whether the picture matches a script —
-    // doing so makes it reject every imperfect-but-usable illustration.
+    // Checks three things that make an image unusable for a kids' book: broken
+    // anatomy, non-G-rated content, and garbled artifacts. It must NOT judge
+    // story/character fidelity (clothing, identity, age, head count, scene
+    // match) — that over-rejects every usable illustration and never converges.
     res = await recordCall(env, 'anthropic', 'moderation', () => client.messages.create({
       model,
-      max_tokens: 300,
+      max_tokens: 400,
       system:
-        'You inspect a single AI-generated cartoon illustration for GROSS PHYSICAL MALFORMATIONS only — ' +
-        'the kind of glitches image generators produce. ' +
-        'Flag ONLY clear, unmistakable body horror: a person or animal with extra or missing limbs, ' +
-        'two heads on one body, a head floating with no body attached, two faces fused together, ' +
-        'melted or distorted facial features, a clearly duplicated/garbled extra body, or hands with ' +
-        'the wrong number of fingers or twisted into impossible shapes. ' +
-        'Do NOT flag any of these — they are NOT defects: clothing, aprons, accessories, glasses, ' +
-        'hairstyle, age, character identity, how many people are present, whether the picture matches ' +
-        'any script or description, art style, colors, background, or cropping. ' +
-        'You are not checking accuracy or story fidelity, only whether bodies are physically coherent. ' +
-        'When in doubt, the image is fine. Always call the report_image tool.',
+        'You are a strict quality checker for a picture book for young children (ages 3 to 9). ' +
+        'Inspect a single AI-generated illustration and flag it if it has any clear, real problem in these categories:\n' +
+        '1. Broken anatomy: a person or animal with extra or missing limbs, more than one head, a head with no ' +
+        'body attached, two faces fused together, melted or distorted facial features, a duplicated/garbled extra ' +
+        'body, or hands with the wrong number of fingers or twisted into impossible shapes.\n' +
+        '2. Not G-rated: the image must be wholesome and kid-safe. Flag anything scary, violent, gory, threatening, ' +
+        'distressing or sad, any blood or injury, weapons used menacingly, frightening or grotesque monsters, ' +
+        'nudity or suggestive content, or any dark or disturbing mood not appropriate for a young child.\n' +
+        '3. Garbled artifacts: nonsense or jumbled text/letters rendered in the image, severe smearing, or an image ' +
+        'that is broken or unrecognizable.\n' +
+        'Do NOT flag any of these — they are NOT problems: art style, color choices, whether clothing, accessories, ' +
+        'age, or identity match any description, how many characters are present (unless a body is malformed), ' +
+        'background details, cropping, or minor imperfections. You are not checking story accuracy. A gentle, gentle ' +
+        'cartoon "problem" that the story gives a kind ending (a friendly dragon, a small worry, a tidy mess) is FINE ' +
+        'and not scary. When a problem is borderline or you are unsure, treat the image as acceptable. ' +
+        'Always call the report_image tool.',
       tools: [
         {
           name: 'report_image',
-          description: 'Report whether the illustration is free of gross anatomical malformations.',
+          description: 'Report whether the illustration is anatomically coherent, G-rated, and free of garbled artifacts.',
           input_schema: {
             type: 'object',
             properties: {
-              ok: { type: 'boolean', description: 'true if no body is physically malformed.' },
+              ok: { type: 'boolean', description: 'true if the image is usable for a kids book (no clear anatomy, safety, or artifact problem).' },
               problems: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Short list of any gross anatomical malformations found. Empty when the image is fine.',
+                description: 'Short list of any clear problems found. Empty when the image is fine.',
               },
             },
             required: ['ok', 'problems'],
@@ -506,7 +516,7 @@ export async function checkImageQuality(
                 data: arrayBufferToBase64(opts.image),
               },
             },
-            { type: 'text', text: 'Inspect this illustration for gross physical malformations only, then call report_image.' },
+            { type: 'text', text: 'Check this illustration for broken anatomy, non-G-rated content, or garbled artifacts, then call report_image.' },
           ],
         },
       ],

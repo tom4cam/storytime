@@ -50,11 +50,12 @@ function qcEnabled(env: Env): boolean {
   return !(v === '1' || v === 'true' || v === 'yes');
 }
 
-// Generate an image, then (unless QC is disabled) run a vision check for gross
-// anatomical malformations. On a rejection, regenerate with a different seed.
-// If every attempt is flagged we fall back to the FIRST image: it used the
-// shared per-story seed, so it stays the most visually consistent with the
-// rest of the book — better than failing the story over one imperfect picture.
+// Generate an image, then (unless QC is disabled) run a vision check for broken
+// anatomy, non-G-rated content, or garbled artifacts. On a rejection, regenerate
+// with a different seed. If every attempt is flagged we fall back to the FIRST
+// image: it used the shared per-story seed, so it stays the most visually
+// consistent with the rest of the book — better than failing the story over one
+// imperfect picture.
 async function generateCheckedImage(
   env: Env,
   fullPrompt: string,
