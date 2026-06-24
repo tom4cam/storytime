@@ -50,32 +50,28 @@ function qcEnabled(env: Env): boolean {
   return !(v === '1' || v === 'true' || v === 'yes');
 }
 
-// Generate an image, then (unless QC is disabled) run a vision check for
-// anatomical/composition defects. On a rejection, regenerate with a different
-// seed. After exhausting attempts we keep the last image rather than failing
-// the whole story over one imperfect picture.
+// Generate an image, then (unless QC is disabled) run a vision check for gross
+// anatomical malformations. On a rejection, regenerate with a different seed.
+// If every attempt is flagged we fall back to the FIRST image: it used the
+// shared per-story seed, so it stays the most visually consistent with the
+// rest of the book — better than failing the story over one imperfect picture.
 async function generateCheckedImage(
   env: Env,
   fullPrompt: string,
-  opts: { seed: number; characters: string; scene: string },
+  opts: { seed: number },
 ): Promise<{ data: ArrayBuffer; contentType: string }> {
   const withQc = qcEnabled(env);
   const attempts = withQc ? IMAGE_QC_MAX_ATTEMPTS : 1;
-  let last: { data: ArrayBuffer; contentType: string } | null = null;
+  let first: { data: ArrayBuffer; contentType: string } | null = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const img = await generateImage(env, fullPrompt, { seed: opts.seed + attempt });
-    last = img;
+    if (attempt === 0) first = img;
     if (!withQc) return img;
-    const verdict = await checkImageQuality(env, {
-      image: img.data,
-      contentType: img.contentType,
-      characters: opts.characters,
-      scene: opts.scene,
-    });
+    const verdict = await checkImageQuality(env, { image: img.data, contentType: img.contentType });
     if (verdict.ok) return img;
     console.warn(`[build] image QC rejected (attempt ${attempt + 1}/${attempts}): ${verdict.problems.join('; ')}`);
   }
-  return last as { data: ArrayBuffer; contentType: string };
+  return first as { data: ArrayBuffer; contentType: string };
 }
 
 // Defensive: handle any legacy stored prompts that accidentally captured
@@ -268,11 +264,7 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
       }
       const basePrompt = await resolveBasePrompt(p, finalText);
       const fullPrompt = wrapImagePrompt(basePrompt, anchor);
-      const img = await generateCheckedImage(env, fullPrompt, {
-        seed: storySeed,
-        characters: anchor,
-        scene: basePrompt,
-      });
+      const img = await generateCheckedImage(env, fullPrompt, { seed: storySeed });
       const url = await storeMedia(env, `${id}-v${opts.version}-p${i + 1}.jpg`, img.data, img.contentType);
       return { text: finalText, image_url: url, image_prompt: basePrompt } satisfies Paragraph;
     }));

@@ -447,37 +447,46 @@ export function __coerceQcVerdict(input: unknown): ImageQcVerdict {
 
 export async function checkImageQuality(
   env: Env,
-  opts: { image: ArrayBuffer; contentType: string; characters: string; scene: string },
+  opts: { image: ArrayBuffer; contentType: string },
 ): Promise<ImageQcVerdict> {
   const apiKey = requireEnv(env, 'ANTHROPIC_API_KEY');
   const client = new Anthropic({ apiKey });
   const model = env.IMAGE_QC_MODEL || DEFAULT_QC_MODEL;
-  const charLine = opts.characters.trim() ? `Expected characters: ${opts.characters.trim()}\n` : '';
 
   let res: Awaited<ReturnType<typeof client.messages.create>>;
   try {
     // Telemetry kind 'moderation' (closest existing bucket); cost kind 'image_qc'.
+    // IMPORTANT: this checks ONLY for the kind of grotesque anatomy glitches
+    // image generators produce. It must NOT judge clothing, identity, age,
+    // how many people are present, or whether the picture matches a script —
+    // doing so makes it reject every imperfect-but-usable illustration.
     res = await recordCall(env, 'anthropic', 'moderation', () => client.messages.create({
       model,
       max_tokens: 300,
       system:
-        "You inspect AI-generated children's book illustrations for clear anatomical or composition defects. " +
-        'Flag ONLY obvious, unmistakable problems: a character with extra or missing limbs, more than one head, ' +
-        'a head with no body, fused or melted faces, badly mangled or extra hands and fingers, or extra people ' +
-        'who do not belong in the scene. Do NOT flag art style, coloring, cropping, background detail, or minor ' +
-        'imperfections. When unsure, treat the image as acceptable. Always call the report_image tool.',
+        'You inspect a single AI-generated cartoon illustration for GROSS PHYSICAL MALFORMATIONS only — ' +
+        'the kind of glitches image generators produce. ' +
+        'Flag ONLY clear, unmistakable body horror: a person or animal with extra or missing limbs, ' +
+        'two heads on one body, a head floating with no body attached, two faces fused together, ' +
+        'melted or distorted facial features, a clearly duplicated/garbled extra body, or hands with ' +
+        'the wrong number of fingers or twisted into impossible shapes. ' +
+        'Do NOT flag any of these — they are NOT defects: clothing, aprons, accessories, glasses, ' +
+        'hairstyle, age, character identity, how many people are present, whether the picture matches ' +
+        'any script or description, art style, colors, background, or cropping. ' +
+        'You are not checking accuracy or story fidelity, only whether bodies are physically coherent. ' +
+        'When in doubt, the image is fine. Always call the report_image tool.',
       tools: [
         {
           name: 'report_image',
-          description: 'Report whether the illustration is free of anatomical and composition defects.',
+          description: 'Report whether the illustration is free of gross anatomical malformations.',
           input_schema: {
             type: 'object',
             properties: {
-              ok: { type: 'boolean', description: 'true if the image has no clear defect.' },
+              ok: { type: 'boolean', description: 'true if no body is physically malformed.' },
               problems: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Short list of any clear defects found. Empty when the image is fine.',
+                description: 'Short list of any gross anatomical malformations found. Empty when the image is fine.',
               },
             },
             required: ['ok', 'problems'],
@@ -497,7 +506,7 @@ export async function checkImageQuality(
                 data: arrayBufferToBase64(opts.image),
               },
             },
-            { type: 'text', text: `${charLine}Scene: ${opts.scene.trim()}\n\nInspect the illustration and call report_image.` },
+            { type: 'text', text: 'Inspect this illustration for gross physical malformations only, then call report_image.' },
           ],
         },
       ],

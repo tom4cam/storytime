@@ -60,7 +60,7 @@ async function rebuildOne(t: Target): Promise<void> {
     regenerate_image: true,
   }));
 
-  console.log(`  Building (kontext images + per-paragraph narration)...`);
+  console.log(`  Building (schnell images + QC retry + per-paragraph narration)...`);
   const t0 = Date.now();
   const built = await buildAndSaveVersion(env, {
     id: previous.id,
