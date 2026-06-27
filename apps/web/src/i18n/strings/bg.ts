@@ -168,7 +168,7 @@ export const bg = {
   "story.adminDeleteVersionBody": "This version, its pictures, and its audio will be removed. If it's the latest version, the story will roll back to the previous one.",
   "story.adminForceDelete": "Force-delete entire story",
   "story.adminForceDeleteConfirm": "Force-delete this story?",
-  "story.adminForceDeleteBody": "All versions, pictures, and audio for this story will be removed. This bypasses the usual ownership check.",
+  "story.adminForceDeleteBody": "All versions and all translations (every language in its group), plus their pictures and audio, will be removed. This bypasses the usual ownership check.",
   "admin.confirmPrompt": "Type {word} to confirm.",
   "admin.confirmPlaceholder": "Type the word here",
   "admin.confirmWord": "DELETE",

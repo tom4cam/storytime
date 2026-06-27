@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { collectReferencedMediaKeys, groupStoryIndexes, listStoryVersionNumbers } from './storage';
+import { collectReferencedMediaKeys, groupStoryIndexes, listGroupMemberIds, listStoryVersionNumbers } from './storage';
 import type { Env } from './env';
 import type { StoryIndex } from './types';
 
@@ -155,5 +155,29 @@ describe('listStoryVersionNumbers', () => {
   it('returns an empty array for a story with no versions', async () => {
     const env = { STORIES: memStories({}) } as unknown as Env;
     expect(await listStoryVersionNumbers(env, 'a')).toEqual([]);
+  });
+});
+
+describe('listGroupMemberIds', () => {
+  it('returns every member sharing the group_id (incl. members reached from any member), regardless of status/listed', async () => {
+    // src (en) is the group root; sv + fr are translations. other is unrelated.
+    const blobs = {
+      'src/index.json': { id: 'src', group_id: 'src', language: 'en', status: 'ready' },
+      'sv/index.json': { id: 'sv', group_id: 'src', language: 'sv', status: 'ready', listed: false },
+      'fr/index.json': { id: 'fr', group_id: 'src', language: 'fr', status: 'generating' },
+      'other/index.json': { id: 'other', group_id: 'other', language: 'en', status: 'ready' },
+    };
+    const env = { STORIES: memStories(blobs) } as unknown as Env;
+
+    // Asked from a translation, still finds the whole group (including the root).
+    const ids = (await listGroupMemberIds(env, 'sv')).sort();
+    expect(ids).toEqual(['fr', 'src', 'sv']);
+    expect(ids).not.toContain('other');
+  });
+
+  it('returns just the story itself when it has no group_id', async () => {
+    const blobs = { 'solo/index.json': { id: 'solo', language: 'en', status: 'ready' } };
+    const env = { STORIES: memStories(blobs) } as unknown as Env;
+    expect(await listGroupMemberIds(env, 'solo')).toEqual(['solo']);
   });
 });

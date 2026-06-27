@@ -141,6 +141,48 @@ export async function deleteStoryAndMedia(env: Env, id: string): Promise<{ story
   return { story: storyList.objects.length, media: mediaList.objects.length };
 }
 
+// Every story id in the same translation group as `id` (shares group_id),
+// including `id` itself. Reads index blobs directly so it catches members
+// regardless of status/listed (unlike listStoryIndexes, which filters). A
+// story with no group_id is its own group of one.
+export async function listGroupMemberIds(env: Env, id: string): Promise<string[]> {
+  const idx = await getStoryIndex(env, id);
+  const groupId = idx?.group_id;
+  if (!groupId) return [id];
+  const all = await env.STORIES.list({ limit: 1000 });
+  const indexKeys = all.objects.filter((o) => o.key.endsWith('/index.json'));
+  const ids = new Set<string>([id]);
+  await Promise.all(indexKeys.map(async (o) => {
+    const blob = await env.STORIES.get(o.key);
+    if (!blob) return;
+    try {
+      const m = (await blob.json()) as StoryIndex;
+      if (m.id && m.group_id === groupId) ids.add(m.id);
+    } catch { /* ignore unparseable blob */ }
+  }));
+  return [...ids];
+}
+
+// Hard-delete a story AND all of its translations (every member of its
+// translation group), with all versions and media of each. Translations reuse
+// the source story's image keys by URL, so deleting just one member would
+// orphan or break the rest — removing the whole group is the only consistent
+// "delete the entire story" operation.
+export async function deleteStoryGroupAndMedia(
+  env: Env,
+  id: string
+): Promise<{ ids: string[]; story: number; media: number }> {
+  const ids = await listGroupMemberIds(env, id);
+  let story = 0;
+  let media = 0;
+  for (const memberId of ids) {
+    const counts = await deleteStoryAndMedia(env, memberId);
+    story += counts.story;
+    media += counts.media;
+  }
+  return { ids, story, media };
+}
+
 export function groupStoryIndexes(
   indexes: StoryIndex[],
   preferredLang: Lang | null,
