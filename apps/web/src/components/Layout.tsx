@@ -116,6 +116,13 @@ export function Layout({ children, showExit = false }: Props) {
         {t('dedication.line')}{' · '}
         <a href="https://github.com/tom4cam/Story-Maker" target="_blank" rel="noopener noreferrer">
           Source on GitHub
+        </a>{' · '}
+        <a
+          href="https://creativecommons.org/publicdomain/zero/1.0/"
+          target="_blank"
+          rel="noopener noreferrer license"
+        >
+          {t('footer.license')}
         </a>
       </div>
     </div>

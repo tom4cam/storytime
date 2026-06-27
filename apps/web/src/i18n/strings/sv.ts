@@ -5,6 +5,7 @@ export const sv: Record<StringKey, string> = {
   'brand.name': 'storytime',
   'brand.tagline': 'Berätta en saga. Hör den. Se den.',
   'dedication.line': 'Gjord med kärlek av farbror Tom till Brennans och Linnéas födelsedagar.',
+  'footer.license': 'Berättelser är CC0 (allmän egendom)',
 
   // Home page
   'home.heroTitle': 'Skapa egna sagor',

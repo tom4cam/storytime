@@ -2,6 +2,7 @@ export const es = {
   "brand.name": "storytime",
   "brand.tagline": "Crea un cuento. Escúchalo. Míralo.",
   "dedication.line": "Hecho con amor por el Tío Tom para los cumpleaños de Brennan y Linnéa.",
+  "footer.license": "Los cuentos son CC0 (dominio público)",
   "home.heroTitle": "Crea tus propios cuentos",
   "home.heroBody": "Elige un héroe, un lugar y un problema: lo escribimos, dibujamos y leemos en voz alta, solo para ti.",
   "home.heroCta": "Comenzar un nuevo cuento",

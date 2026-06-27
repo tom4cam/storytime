@@ -2,6 +2,7 @@ export const bg = {
   "brand.name": "storytime",
   "brand.tagline": "Разкажи история. Чуй я. Гледай я.",
   "dedication.line": "Направено с любов от чичо Том за рожденията на Brennan и Linnéa.",
+  "footer.license": "Историите са CC0 (обществено достояние)",
   "home.heroTitle": "Създавай свои истории",
   "home.heroBody": "Избери герой, място, проблем — ние я пишем, рисуваме и четем на глас, само за теб.",
   "home.heroCta": "Започни нова история",

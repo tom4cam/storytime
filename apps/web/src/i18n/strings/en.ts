@@ -3,6 +3,7 @@ export const en = {
   'brand.name': 'storytime',
   'brand.tagline': 'Tell a story. Hear it. Watch it.',
   'dedication.line': "Made with love by Uncle Tom for Brennan and Linnéa's birthdays.",
+  'footer.license': 'Stories are CC0 (public domain)',
 
   // Home page
   'home.heroTitle': 'Make your own stories',
