@@ -33,6 +33,19 @@ export interface Env {
   IMAGE_QC_MODEL?: string;
   IMAGE_QC_DISABLED?: string;
 
+  // EXPERIMENTAL reference-conditioned image generation (prototype, off by
+  // default). When IMAGE_REF_MODE is "1"/"true"/"yes", the build first renders
+  // a neutral character "reference sheet" from the character bible, then
+  // generates each paragraph image-to-image conditioned on it, for stronger
+  // character consistency than flux/schnell's text+seed alone. This uses a
+  // costlier flux endpoint, so it stays opt-in.
+  //   IMAGE_REF_ENDPOINT  fal i2i model (default fal-ai/flux/dev/image-to-image)
+  //   IMAGE_REF_STRENGTH  0-1 denoise; higher = follow the scene prompt more
+  //                       and the reference image less (default 0.85)
+  IMAGE_REF_MODE?: string;
+  IMAGE_REF_ENDPOINT?: string;
+  IMAGE_REF_STRENGTH?: string;
+
   // Optional OpenAI TTS overrides. OPENAI_TTS_MODEL defaults to "tts-1";
   // set to "gpt-4o-mini-tts" to enable the steerable model. When the model
   // is steerable, OPENAI_TTS_INSTRUCTIONS is sent as the `instructions`

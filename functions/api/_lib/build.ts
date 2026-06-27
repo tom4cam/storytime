@@ -4,7 +4,7 @@
 import type { Env } from './env';
 import { checkImageQuality, generateStory, regenerateImagePrompt, regenerateParagraphText, translateStory as runTranslation } from './anthropic';
 import { synthesizeStory } from './narration';
-import { generateImage } from './fal';
+import { generateImage, generateImageFromRef } from './fal';
 import { moderate } from './moderation';
 import { getStoryVersion, listStoryIndexes, saveStoryVersion, storeMedia } from './storage';
 import { isOverMonthlyCap } from './costs';
@@ -18,24 +18,31 @@ export class ModerationError extends Error {
 const FAL_CONCURRENCY = 10;
 
 // The image-gen style anchor. Flux is sensitive to style tokens; one
-// consistent anchor across every image keeps the whole book visually
-// coherent. Tweak here to evolve the look.
+// consistent anchor — including an explicit, fixed palette — across every
+// image keeps the whole book visually coherent and limits color drift
+// between paragraphs. Tweak here to evolve the look.
 const IMAGE_STYLE =
-  "Soft modern children's picture book illustration, warm pastel palette, " +
-  'gentle hand-drawn lines, friendly rounded faces, expressive eyes, simple flat shapes';
+  "soft modern children's picture book illustration, gentle hand-drawn lines, " +
+  'friendly rounded faces, expressive eyes, simple flat shapes, ' +
+  'consistent warm pastel palette of peach, butter yellow, sky blue, sage green, and cream';
 
+// Front-load the characters (flux weights early tokens most), then the scene,
+// then the fixed style/palette suffix — so the cast and the look stay pinned
+// the same way on every paragraph.
 function wrapImagePrompt(scene: string, characters: string | undefined): string {
   const charLine = characters?.trim() ? `Characters: ${characters.trim()}. ` : '';
-  return `${IMAGE_STYLE}. ${charLine}Scene: ${scene.trim()}. No text, no signs, no letters in the image.`;
+  return `${charLine}Scene: ${scene.trim()}. Style: ${IMAGE_STYLE}. No text, no signs, no letters in the image.`;
 }
 
 // Up to this many tries per image when the QC pass rejects one (the first
 // try plus two regenerations with a fresh seed).
 const IMAGE_QC_MAX_ATTEMPTS = 3;
 
-// A deterministic per-story seed. Sharing one seed across every paragraph's
-// image nudges flux/schnell toward a consistent character/style look across
-// the book (schnell has no image conditioning, so this is the main lever).
+// A deterministic seed. Sharing one seed across every paragraph's image nudges
+// flux/schnell toward a consistent character/style look across the book
+// (schnell has no image conditioning, so this is the main lever). Callers seed
+// from the series id when a story belongs to a series, so every installment
+// (not just every paragraph) shares the look.
 function seedFromId(id: string): number {
   let h = 2166136261;
   for (let i = 0; i < id.length; i += 1) {
@@ -50,38 +57,52 @@ function qcEnabled(env: Env): boolean {
   return !(v === '1' || v === 'true' || v === 'yes');
 }
 
-// Generate an image, then (unless QC is disabled) run a vision check for broken
-// anatomy, non-G-rated content, or garbled artifacts. On a rejection, regenerate
-// with a different seed. If every attempt is flagged we fall back to the FIRST
-// image: it used the shared per-story seed, so it stays the most visually
-// consistent with the rest of the book — better than failing the story over one
-// imperfect picture.
+// EXPERIMENTAL reference-conditioned mode (off by default). See env.ts.
+function refModeEnabled(env: Env): boolean {
+  const v = (env.IMAGE_REF_MODE || '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
+function refStrength(env: Env): number {
+  const n = parseFloat(env.IMAGE_REF_STRENGTH || '');
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.85;
+}
+
+type ImageBytes = { data: ArrayBuffer; contentType: string };
+
+// Generate an image via `gen`, then (unless QC is disabled) run a vision check
+// for broken anatomy, non-G-rated content, or garbled artifacts. On a rejection,
+// regenerate with a different seed. If every attempt is flagged we fall back to
+// the FIRST image: it used the shared per-story seed, so it stays the most
+// visually consistent with the rest of the book — better than failing the story
+// over one imperfect picture. `gen` takes the seed so text-to-image and
+// reference-conditioned i2i can share this retry/QC harness.
 async function generateCheckedImage(
   env: Env,
-  fullPrompt: string,
-  opts: { seed: number },
-): Promise<{ data: ArrayBuffer; contentType: string }> {
+  gen: (seed: number) => Promise<ImageBytes>,
+  baseSeed: number,
+): Promise<ImageBytes> {
   const withQc = qcEnabled(env);
   const attempts = withQc ? IMAGE_QC_MAX_ATTEMPTS : 1;
-  let first: { data: ArrayBuffer; contentType: string } | null = null;
+  let first: ImageBytes | null = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const img = await generateImage(env, fullPrompt, { seed: opts.seed + attempt });
+    const img = await gen(baseSeed + attempt);
     if (attempt === 0) first = img;
     if (!withQc) return img;
     const verdict = await checkImageQuality(env, { image: img.data, contentType: img.contentType });
     if (verdict.ok) return img;
     console.warn(`[build] image QC rejected (attempt ${attempt + 1}/${attempts}): ${verdict.problems.join('; ')}`);
   }
-  return first as { data: ArrayBuffer; contentType: string };
+  return first as ImageBytes;
 }
 
-// Defensive: handle any legacy stored prompts that accidentally captured
-// the wrap. We save the bare scene now, so this is a no-op for new data.
+// Defensive: handle any legacy stored prompts that accidentally captured the
+// wrap. We save the bare scene now, so this is a no-op for new data. Pulls out
+// whatever sits between "Scene:" and the trailing "Style:"/"No text" suffix,
+// which covers every wrap format we've shipped.
 function unwrapImagePrompt(p: string): string {
-  const legacy = p.match(/^Cartoon illustration\. Characters: [^]*? Scene: ([^]*?) Style: bright colors, friendly faces, cartoon style, no text in the image\.\s*$/);
-  if (legacy) return legacy[1].trim();
-  const fresh = p.match(/^Soft modern[^]*? Scene: ([^]*?)\.\s*No text, no signs, no letters in the image\.\s*$/);
-  if (fresh) return fresh[1].trim();
+  const m = p.match(/Scene:\s*([^]*?)\.\s*(?:Style:|No text)/);
+  if (m) return m[1].trim();
   return p;
 }
 
@@ -235,8 +256,15 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
   // text-to-image, from its style-wrapped prompt. Paragraphs whose text and
   // prompt are unchanged reuse their stored image. Batched to respect the
   // fal concurrency budget.
-  const anchor = [opts.character_bible?.trim(), opts.summary?.trim()].filter(Boolean).join(' ');
-  const storySeed = seedFromId(id);
+  //
+  // The "Characters:" anchor is the character bible alone (purely visual, the
+  // strongest consistency signal); the editable story summary is only a
+  // fallback for older stories that never got a bible, so it never dilutes the
+  // bible when one exists.
+  const anchor = opts.character_bible?.trim() || opts.summary?.trim() || '';
+  // Seed from the series so every installment shares the look, not just every
+  // paragraph within one book.
+  const storySeed = seedFromId(opts.series_id || id);
 
   const resolveBasePrompt = async (
     p: BuildOptions['paragraphs'][number],
@@ -248,6 +276,24 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
       ? unwrapImagePrompt(p.image_prompt as string)
       : regenerateImagePrompt(env, finalText, title, instruction);
   };
+
+  // EXPERIMENTAL: when ref mode is on and we have a character anchor, render a
+  // neutral character "reference sheet" once, then condition every paragraph on
+  // it (image-to-image) for stronger character consistency. Generated up front
+  // so the per-paragraph batches can all reference the same sheet.
+  let refSheet: ImageBytes | null = null;
+  if (refModeEnabled(env) && anchor) {
+    const refScene = 'character reference sheet, each character shown full-body and front-facing, '
+      + 'standing side by side on a plain neutral light-grey background, even soft lighting';
+    const refPrompt = wrapImagePrompt(refScene, anchor);
+    try {
+      refSheet = await generateCheckedImage(env, (seed) => generateImage(env, refPrompt, { seed }), storySeed);
+      console.log('[build] ref-conditioned mode: reference sheet generated');
+    } catch (e) {
+      console.warn('[build] ref sheet generation failed; falling back to text-to-image', (e as Error).message);
+    }
+  }
+  const strength = refStrength(env);
 
   const paragraphs: Paragraph[] = new Array(opts.paragraphs.length);
   for (let start = 0; start < opts.paragraphs.length; start += FAL_CONCURRENCY) {
@@ -265,7 +311,10 @@ export async function buildAndSaveVersion(env: Env, opts: BuildOptions): Promise
       }
       const basePrompt = await resolveBasePrompt(p, finalText);
       const fullPrompt = wrapImagePrompt(basePrompt, anchor);
-      const img = await generateCheckedImage(env, fullPrompt, { seed: storySeed });
+      const gen = refSheet
+        ? (seed: number) => generateImageFromRef(env, fullPrompt, refSheet as ImageBytes, { seed, strength })
+        : (seed: number) => generateImage(env, fullPrompt, { seed });
+      const img = await generateCheckedImage(env, gen, storySeed);
       const url = await storeMedia(env, `${id}-v${opts.version}-p${i + 1}.jpg`, img.data, img.contentType);
       return { text: finalText, image_url: url, image_prompt: basePrompt } satisfies Paragraph;
     }));
