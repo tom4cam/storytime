@@ -705,12 +705,26 @@ ul.answer-list li b { color: var(--ink-soft); }
   100% { opacity: 0; transform: translate(-50%, -6px); }
 }
 
+/* Shown only when printing (inverse of .no-print). */
+.print-only { display: none; }
+
 /* Print: clean PDF output via browser "Save as PDF" in the print dialog */
 @media print {
   body { background: white; color: black; padding: 0; margin: 0; font-family: Georgia, 'Times New Roman', serif; }
   body.has-audio-bar { padding-bottom: 0; }
   .page { max-width: none; padding: 0 24px; }
   .header, .footer, .audio-bar, .versions, .story-meta, .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .story-print-license {
+    margin-top: 28px;
+    padding-top: 10px;
+    border-top: 1px solid #999;
+    text-align: center;
+    font-size: 11px;
+    color: #555;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
   .story-title { text-align: center; font-size: 32px; margin: 12px 0 28px; color: black; }
   .paragraph {
     display: grid;

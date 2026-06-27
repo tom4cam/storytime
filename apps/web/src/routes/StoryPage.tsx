@@ -352,6 +352,12 @@ export function StoryPage() {
         </div>
       ))}
 
+      {/* Print/PDF only: the footer (with the CC0 notice) is hidden in print,
+          so stamp the dedication onto printed copies here. */}
+      <div className="print-only story-print-license">
+        {t('footer.license')} · creativecommons.org/publicdomain/zero/1.0/
+      </div>
+
       {story.series && (() => {
         const { members, position } = story.series;
         const prev = members.find((m) => m.position === position - 1);
